@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TikTokバトルトーナメント</title>
+  <link rel="stylesheet" href="/src/styles/base.css" />
+  <link rel="stylesheet" href="/src/styles/components.css" />
+  <style>
+    .landing-wrap {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 32px;
+      padding: 40px 20px;
+      background: var(--color-bg);
+    }
+    .landing-logo { font-size: 3rem; line-height: 1; }
+    .landing-title {
+      font-size: 1.8rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-align: center;
+    }
+    .landing-subtitle {
+      color: var(--color-text-muted);
+      font-size: 1rem;
+      text-align: center;
+      margin-top: -16px;
+    }
+    .landing-btns {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      width: 100%;
+      max-width: 320px;
+    }
+    .landing-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 16px 24px;
+      border-radius: 16px;
+      font-size: 1rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: opacity 0.15s, transform 0.15s;
+      border: 2px solid transparent;
+    }
+    .landing-btn-viewer {
+      background: linear-gradient(135deg, #fe2c55, #ff6b8a);
+      color: white;
+    }
+    .landing-btn-viewer:hover { opacity: 0.9; transform: translateY(-2px); }
+    .landing-btn-admin {
+      background: #1a1a2e;
+      border-color: #333;
+      color: #aaa;
+    }
+    .landing-btn-admin:hover { border-color: #666; color: #eee; transform: translateY(-2px); }
+  </style>
+</head>
+<body>
+  <div class="landing-wrap">
+    <div class="landing-logo">🔥</div>
+    <h1 class="landing-title">TikTokバトルトーナメント</h1>
+    <p class="landing-subtitle">大会情報の閲覧・管理ができます</p>
+    <div class="landing-btns">
+      <a href="/viewer.html" class="landing-btn landing-btn-viewer">🏆 大会情報を見る</a>
+      <a href="/admin.html" class="landing-btn landing-btn-admin">🔒 管理者ログイン</a>
+    </div>
+  </div>
+</body>
+</html>

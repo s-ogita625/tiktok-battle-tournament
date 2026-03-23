@@ -1,0 +1,1609 @@
+/* === 参加者管理ページ === */
+.participants-layout {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .participants-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.participant-form-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: 24px;
+  position: sticky;
+  top: 84px;
+}
+
+.participant-form-card .form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.participant-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.participant-count {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.participant-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.participant-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  transition: var(--transition);
+}
+
+.participant-card:hover {
+  border-color: var(--color-text-dim);
+  box-shadow: var(--shadow-sm);
+}
+
+.participant-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.participant-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.participant-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.participant-sales {
+  font-size: 0.8rem;
+  color: var(--color-secondary);
+  font-weight: 600;
+}
+
+.participant-card-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.participant-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.participant-dates {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.date-chip {
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.date-chip.available {
+  background: rgba(76, 175, 80, 0.15);
+  color: var(--color-success);
+}
+
+.date-chip.unavailable {
+  background: rgba(244, 67, 54, 0.15);
+  color: var(--color-danger);
+}
+
+/* === グループステージページ === */
+.group-stage-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.groups-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.group-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+}
+
+.group-card-header {
+  padding: 16px 20px;
+  background: var(--color-surface2);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.group-name {
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.group-advance-badge {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.group-standings {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.standings-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.standings-table th {
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  padding: 4px 6px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.standings-table th:first-child { text-align: left; }
+
+.standings-table td {
+  padding: 6px 6px;
+  text-align: center;
+  border-top: 1px solid var(--color-border);
+}
+
+.standings-table td:first-child { text-align: left; }
+
+.standing-player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.standing-rank {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.rank-1 { background: #ffd700; color: #000; }
+.rank-2 { background: #c0c0c0; color: #000; }
+.rank-3 { background: #cd7f32; color: #000; }
+.rank-other { background: var(--color-surface3); color: var(--color-text-muted); }
+
+.advance-indicator {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-secondary);
+  margin-left: 4px;
+}
+
+.group-battles {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* === 対戦カード === */
+.battle-card {
+  background: var(--color-surface2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  transition: var(--transition);
+}
+
+.battle-card.completed {
+  border-color: var(--color-surface3);
+  opacity: 0.85;
+}
+
+.battle-card-date {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.battle-card-date .no-date {
+  color: var(--color-warning);
+}
+
+.battle-card-players {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.battle-player {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.battle-player-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  color: var(--color-text);
+}
+
+.battle-player-link:hover {
+  text-decoration: none;
+  opacity: 0.8;
+}
+
+.battle-player-avatar-wrap {
+  position: relative;
+}
+
+.battle-player-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--color-border);
+  transition: var(--transition);
+}
+
+.battle-player-link:hover .battle-player-avatar {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-glow-red);
+}
+
+.battle-player-initials {
+  width: 64px;
+  height: 64px;
+  font-size: 1.4rem;
+}
+
+.battle-player-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: center;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.winner-crown {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 1rem;
+}
+
+.battle-vs {
+  font-size: 1rem;
+  font-weight: 900;
+  color: var(--color-text-dim);
+  flex-shrink: 0;
+}
+
+.battle-score-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.battle-score-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.battle-score-separator {
+  color: var(--color-text-dim);
+}
+
+.score-winner {
+  color: var(--color-secondary);
+}
+
+.score-loser {
+  color: var(--color-text-muted);
+}
+
+.battle-score-inputs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.battle-result-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+/* ======================================================
+   ホーム画面（大会一覧・作成）
+   ====================================================== */
+
+#home-container {
+  min-height: 100vh;
+  background: var(--color-bg);
+}
+
+.home-wrap {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 40px 20px 80px;
+}
+
+/* ヒーローセクション */
+.home-hero {
+  text-align: center;
+  padding: 60px 20px 48px;
+}
+
+.home-hero-icon {
+  font-size: 3.5rem;
+  margin-bottom: 16px;
+}
+
+.home-hero-title {
+  font-size: 2rem;
+  font-weight: 900;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 10px;
+}
+
+.home-hero-sub {
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+  margin-bottom: 28px;
+}
+
+/* セクション */
+.home-section {
+  margin-top: 40px;
+}
+
+.home-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 14px;
+  color: var(--color-text-dim);
+}
+
+/* 大会カードリスト */
+.home-tournament-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.home-tournament-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  transition: var(--transition);
+}
+
+.home-tournament-card:hover {
+  border-color: var(--color-text-dim);
+  box-shadow: var(--shadow-sm);
+}
+
+.home-tc-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+.home-tc-icon {
+  font-size: 1.6rem;
+  flex-shrink: 0;
+}
+
+.home-tc-info {
+  min-width: 0;
+}
+
+.home-tc-title {
+  font-size: 1rem;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.home-tc-meta {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  margin-top: 3px;
+}
+
+.home-tc-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* 進行中カード */
+.home-active-card {
+  border-color: rgba(254, 44, 85, 0.4);
+  background: rgba(254, 44, 85, 0.04);
+}
+
+.home-active-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 12px rgba(254, 44, 85, 0.15);
+}
+
+.home-active-badge {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+/* ======================================================
+   ナビゲーションバー（大会編集モード）
+   ====================================================== */
+
+.nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 20px;
+  height: 60px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.nav-home-btn {
+  background: var(--color-surface2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.nav-home-btn:hover {
+  background: var(--color-surface3);
+  color: var(--color-text);
+}
+
+.nav-tournament-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex-shrink: 1;
+  max-width: 200px;
+}
+
+#nav-container {
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+/* ======================================================
+   トーナメント ブラケット表 UI
+   ====================================================== */
+
+.tnmt-winner-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: linear-gradient(135deg, rgba(255,215,0,0.12), rgba(37,244,238,0.08));
+  border: 1px solid rgba(255,215,0,0.4);
+  border-radius: var(--radius-xl);
+  padding: 20px 24px;
+  margin-bottom: 28px;
+}
+
+.tnmt-winner-trophy  { font-size: 2.5rem; flex-shrink: 0; }
+
+.tnmt-winner-avatar {
+  width: 60px; height: 60px;
+  border-radius: 50%; object-fit: cover;
+  border: 2px solid #ffd700; flex-shrink: 0;
+}
+
+.tnmt-winner-initials {
+  width: 60px; height: 60px;
+  font-size: 1.2rem; flex-shrink: 0;
+}
+
+.tnmt-winner-label {
+  font-size: 0.75rem; color: #ffd700;
+  font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+}
+
+.tnmt-winner-name {
+  font-size: 1.5rem; font-weight: 900;
+  background: linear-gradient(135deg, #ffd700, var(--color-secondary));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+
+/* ブラケットテーブル全体 */
+.bracket-scroll-wrap {
+  overflow-x: auto;
+  padding-bottom: 16px;
+}
+
+.bracket-table {
+  display: flex;
+  gap: 0;
+  align-items: stretch;
+  min-width: max-content;
+  padding: 8px 0 24px;
+}
+
+/* ラウンド列 */
+.bracket-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 190px;
+  width: 190px;
+}
+
+.bracket-col-header {
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  background: var(--color-surface2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 6px 10px;
+  margin: 0 8px 16px;
+}
+
+.bracket-col-header.is-final-header {
+  color: #ffd700;
+  border-color: rgba(255,215,0,0.4);
+  background: rgba(255,215,0,0.06);
+}
+
+.bracket-col-matches {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  justify-content: space-around;
+}
+
+/* 対戦ラッパー（スペーシング + 接続線） */
+.bracket-match-wrap {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  position: relative;
+  padding: calc(var(--spacing, 1) * 12px) 0;
+}
+
+/* 対戦ボックス本体 */
+.bracket-match-box {
+  flex: 1;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin: 0 8px;
+  cursor: default;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  position: relative;
+}
+
+.bracket-match-box[data-clickable="true"] {
+  cursor: pointer;
+}
+
+.bracket-match-box[data-clickable="true"]:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(254, 44, 85, 0.18);
+}
+
+.bracket-match-box.is-done {
+  border-color: var(--color-surface3);
+}
+
+.bracket-match-box.is-final {
+  border-color: rgba(255,215,0,0.5);
+  box-shadow: 0 0 16px rgba(255,215,0,0.1);
+}
+
+.bracket-match-box.is-final[data-clickable="true"]:hover {
+  border-color: #ffd700;
+  box-shadow: 0 0 20px rgba(255,215,0,0.25);
+}
+
+.bracket-match-box.is-bye {
+  opacity: 0.55;
+}
+
+/* セパレーター */
+.bracket-match-sep {
+  height: 1px;
+  background: var(--color-border);
+}
+
+/* BYEラベル */
+.bracket-bye-label {
+  position: absolute;
+  bottom: 4px;
+  right: 8px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--color-text-dim);
+  letter-spacing: 0.08em;
+}
+
+/* 修正ボタン */
+.bracket-edit-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: var(--color-surface3);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  padding: 2px 5px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.bracket-match-box:hover .bracket-edit-btn {
+  opacity: 1;
+}
+
+/* プレイヤー行 */
+.bracket-player {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  gap: 6px;
+  min-height: 44px;
+  transition: background 0.15s;
+}
+
+.bracket-player-inner {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+  text-decoration: none;
+  color: inherit;
+}
+
+.bracket-player-inner:hover .bracket-player-name {
+  text-decoration: underline;
+}
+
+.bracket-player-winner {
+  background: rgba(37, 244, 238, 0.07);
+}
+
+.bracket-player-loser {
+  opacity: 0.5;
+}
+
+.bracket-player-tbd {
+  opacity: 0.35;
+}
+
+.bracket-player-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.bracket-player-avatar-init {
+  width: 28px;
+  height: 28px;
+  font-size: 0.65rem;
+  flex-shrink: 0;
+}
+
+.bracket-player-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.bracket-player-name.is-winner { color: var(--color-secondary); }
+.bracket-player-name.is-loser  { color: var(--color-text-muted); }
+
+.bracket-player-score-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.bracket-crown {
+  font-size: 0.9rem;
+}
+
+.bracket-score {
+  font-size: 0.9rem;
+  font-weight: 900;
+  min-width: 36px;
+  text-align: right;
+}
+
+.bracket-score.score-win  { color: var(--color-secondary); }
+.bracket-score.score-lose { color: var(--color-text-muted); }
+
+/* 右接続線（→次ラウンドへ） */
+.bracket-connector-right {
+  width: 16px;
+  flex-shrink: 0;
+  align-self: stretch;
+  position: relative;
+}
+
+.bracket-connector-right::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--color-border);
+}
+
+/* スコア入力モーダル内 */
+.score-modal-players {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 0 4px;
+}
+
+.score-modal-player {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.modal-player-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--color-border);
+}
+
+.score-modal-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.score-modal-input {
+  width: 100%;
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.score-modal-vs {
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: var(--color-text-dim);
+  flex-shrink: 0;
+}
+
+/* === 設定ページ === */
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.settings-section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: 24px;
+}
+
+.settings-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.settings-row:last-child {
+  border-bottom: none;
+}
+
+.settings-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.settings-desc {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+.tournament-size-selector {
+  display: flex;
+  gap: 6px;
+}
+
+.size-btn {
+  padding: 6px 14px;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 700;
+  background: var(--color-surface3);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.size-btn.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: white;
+}
+
+.size-btn:hover:not(.active) {
+  background: var(--color-surface2);
+  border-color: var(--color-text-dim);
+}
+
+/* === データ管理セクション === */
+.data-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.danger-zone {
+  border-color: rgba(244, 67, 54, 0.3);
+}
+
+.danger-zone .settings-section-title {
+  color: var(--color-danger);
+}
+
+/* ===================================================
+   連絡タブ (NoticeBoard)
+   =================================================== */
+
+.notice-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .notice-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 左：選択パネル */
+.notice-select-panel {
+  position: sticky;
+  top: 84px;
+}
+
+.notice-stage-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.notice-stage-btn {
+  text-align: left;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface2);
+  color: var(--color-text);
+  font-size: 0.9rem;
+  transition: var(--transition);
+}
+
+.notice-stage-btn:hover {
+  background: var(--color-surface3);
+  border-color: var(--color-text-dim);
+}
+
+.notice-stage-btn.active {
+  border-color: var(--color-secondary);
+  background: rgba(37, 244, 238, 0.08);
+  color: var(--color-secondary);
+}
+
+/* 右：出力パネル */
+.notice-output-panel {
+  min-height: 200px;
+}
+
+.notice-output-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.notice-output-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.notice-output-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.notice-output-meta {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+/* 案内文テキストボックス */
+.notice-text-box {
+  background: var(--color-surface3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  line-height: 1.7;
+  color: var(--color-text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+/* 対戦一覧 */
+.notice-matches {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.notice-matches-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.notice-match-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--color-surface2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  flex-wrap: wrap;
+}
+
+.notice-match-round {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-secondary);
+  min-width: 80px;
+  white-space: nowrap;
+}
+
+.notice-match-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.notice-match-vs {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.notice-match-date {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+/* ステータスバッジ */
+.notice-match-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+}
+
+.notice-match-badge.done {
+  background: rgba(76, 175, 80, 0.15);
+  color: var(--color-success);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+}
+
+.notice-match-badge.pending {
+  background: rgba(255, 152, 0, 0.12);
+  color: var(--color-warning);
+  border: 1px solid rgba(255, 152, 0, 0.3);
+}
+
+.notice-match-badge.bye {
+  background: rgba(123, 94, 167, 0.15);
+  color: #b39ddb;
+  border: 1px solid rgba(123, 94, 167, 0.3);
+}
+
+/* ===================================================
+   認証ページ (auth.js)
+   =================================================== */
+
+.auth-overlay {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--color-bg);
+}
+
+.auth-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: 40px 36px;
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+}
+
+.auth-logo {
+  font-size: 2.5rem;
+  margin-bottom: 12px;
+}
+
+.auth-title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--color-text);
+  margin-bottom: 6px;
+}
+
+.auth-subtitle {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin-bottom: 28px;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  text-align: left;
+}
+
+.auth-error {
+  background: rgba(244, 67, 54, 0.1);
+  border: 1px solid rgba(244, 67, 54, 0.3);
+  color: var(--color-danger);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.auth-note {
+  margin-top: 20px;
+  font-size: 0.78rem;
+  color: var(--color-text-dim);
+  line-height: 1.6;
+}
+
+.auth-viewer-link {
+  color: var(--color-secondary);
+  text-decoration: none;
+}
+.auth-viewer-link:hover { text-decoration: underline; }
+
+/* 管理画面アクションバー（右上固定）*/
+.admin-action-bar {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: 6px 12px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+
+.btn-xs {
+  font-size: 0.72rem;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+}
+
+/* ===================================================
+   閲覧ページ (ViewerApp.js)
+   =================================================== */
+
+/* ヘッダー */
+.viewer-header {
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.viewer-header-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 24px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.viewer-header-logo {
+  font-size: 1rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.viewer-admin-link {
+  font-size: 0.78rem;
+  color: var(--color-text-dim);
+  text-decoration: none;
+}
+.viewer-admin-link:hover { color: var(--color-text-muted); }
+
+/* アプリラッパー */
+.viewer-app-wrap {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 20px 60px;
+}
+
+/* 空状態 */
+.viewer-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  gap: 12px;
+}
+.viewer-empty-icon  { font-size: 3rem; }
+.viewer-empty-title { font-size: 1.2rem; font-weight: 700; color: var(--color-text); }
+.viewer-empty-desc  { font-size: 0.9rem; color: var(--color-text-muted); }
+
+/* レイアウト */
+.viewer-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .viewer-layout { grid-template-columns: 1fr; }
+}
+
+/* サイドバー */
+.viewer-sidebar {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: 16px;
+  position: sticky;
+  top: 72px;
+}
+
+.viewer-sidebar-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 12px;
+}
+
+.viewer-tournament-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: var(--transition);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.viewer-tournament-btn:hover {
+  background: var(--color-surface2);
+  color: var(--color-text);
+}
+
+.viewer-tournament-btn.active {
+  background: rgba(254, 44, 85, 0.1);
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.viewer-active-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-danger);
+  flex-shrink: 0;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* 大会詳細 */
+.viewer-detail {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: 28px;
+}
+
+.viewer-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.viewer-detail-title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.viewer-detail-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.viewer-active-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  background: rgba(244, 67, 54, 0.12);
+  color: var(--color-danger);
+  border: 1px solid rgba(244, 67, 54, 0.3);
+}
+
+.viewer-finished-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  background: rgba(76, 175, 80, 0.1);
+  color: var(--color-success);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+}
+
+.viewer-detail-count {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+/* タブ */
+.viewer-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 20px;
+}
+
+.viewer-tab {
+  padding: 8px 16px;
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: var(--transition);
+  margin-bottom: -1px;
+}
+
+.viewer-tab:hover { color: var(--color-text); }
+.viewer-tab.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.viewer-tab-content { }
+
+/* 参加者ビュー */
+.viewer-participants-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.viewer-participant-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--color-surface2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 12px 16px;
+  transition: var(--transition);
+}
+.viewer-participant-card:hover { border-color: var(--color-text-dim); }
+
+.viewer-participant-rank {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--color-text-dim);
+  min-width: 28px;
+  text-align: center;
+}
+
+.viewer-participant-avatar-wrap { flex-shrink: 0; }
+.viewer-avatar { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; display: block; }
+.viewer-avatar-init { width: 44px; height: 44px; font-size: 0.9rem; }
+
+.viewer-participant-info { flex: 1; min-width: 0; }
+.viewer-participant-name { font-weight: 700; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.viewer-participant-sales { font-size: 0.82rem; color: var(--color-text-muted); }
+.viewer-tiktok-link { font-size: 0.75rem; color: var(--color-secondary); text-decoration: none; }
+.viewer-tiktok-link:hover { text-decoration: underline; }
+
+/* グループビュー */
+.viewer-groups-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.viewer-group-card {
+  background: var(--color-surface2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: 16px;
+}
+
+.viewer-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.viewer-group-name {
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--color-secondary);
+}
+
+.viewer-group-advance {
+  font-size: 0.72rem;
+  color: var(--color-text-dim);
+}
+
+.viewer-standings-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  margin-bottom: 12px;
+}
+.viewer-standings-table th {
+  text-align: left;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--color-border);
+}
+.viewer-standings-table td {
+  padding: 6px 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.viewer-row-advance td:first-child { color: var(--color-secondary); font-weight: 700; }
+.viewer-row-advance { background: rgba(37, 244, 238, 0.04); }
+
+.viewer-battles { display: flex; flex-direction: column; gap: 6px; }
+
+.viewer-battle-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+}
+.viewer-battle-card.is-done { border-color: rgba(37, 244, 238, 0.2); }
+
+.viewer-battle-date {
+  font-size: 0.72rem;
+  color: var(--color-text-dim);
+  margin-bottom: 4px;
+}
+
+.viewer-battle-players {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.viewer-battle-score {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  min-width: 60px;
+  text-align: center;
+}
+.viewer-battle-winner { color: var(--color-secondary); }
+.viewer-battle-loser  { color: var(--color-text-dim); }
+
+/* 対戦日付（ブラケット内） */
+.viewer-match-date {
+  font-size: 0.65rem;
+  color: var(--color-text-dim);
+  text-align: center;
+  padding: 2px 0;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 2px;
+}
+
+.viewer-empty-section {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  padding: 32px 0;
+  text-align: center;
+}
