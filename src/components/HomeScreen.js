@@ -1,6 +1,6 @@
 import { store, defaultTournament } from '../data/store.js'
 import { generateId } from '../utils/exportUtils.js'
-import { publishTournamentData, getSavedToken } from '../utils/publishUtils.js'
+import { publishTournamentData } from '../utils/publishUtils.js'
 
 export function renderHomeScreen(container, onEnterTournament) {
   function render() {
@@ -190,7 +190,7 @@ export function renderHomeScreen(container, onEnterTournament) {
       if (!ct) return
       const newIsPublic = !ct.isPublic
       store.updateTournament({ isPublic: newIsPublic })
-      await autoPublishIfTokenSaved()
+      await autoPublish()
     })
 
     // 公開/非公開トグル（過去大会）
@@ -202,19 +202,16 @@ export function renderHomeScreen(container, onEnterTournament) {
         if (!t) return
         const updated = tournaments.map(x => x.id === id ? { ...x, isPublic: !x.isPublic } : x)
         store.update({ tournaments: updated })
-        await autoPublishIfTokenSaved()
+        await autoPublish()
       })
     })
   }
 
   /**
-   * GitHub Token が保存済みなら公開中の大会を自動的に publish する
-   * トークン未設定の場合は静かにスキップ（Settings で設定してもらう）
+   * 公開中の大会を自動的に /api/publish へ送信する
+   * トークン不要（サーバー側で管理）
    */
-  async function autoPublishIfTokenSaved() {
-    const token = getSavedToken()
-    if (!token) return // Token 未設定時はスキップ
-
+  async function autoPublish() {
     const { currentTournament, tournaments } = store.getState()
     const all = [
       ...(currentTournament ? [currentTournament] : []),
@@ -222,18 +219,11 @@ export function renderHomeScreen(container, onEnterTournament) {
     ]
     const publicOnes = all.filter(t => t.isPublic === true)
 
-    if (publicOnes.length === 0) {
-      // 全て非公開になった場合も空データを push する
-      const result = await publishTournamentData([], token)
-      if (result.ok) showHomeToast('公開データを更新しました（全て非公開）', 'info')
-      return
-    }
-
-    const result = await publishTournamentData(publicOnes, token)
+    const result = await publishTournamentData(publicOnes)
     if (result.ok) {
       showHomeToast(`✅ ${publicOnes.length}件の大会を公開しました（Vercel反映まで約1〜2分）`, 'success')
     } else {
-      showHomeToast(`⚠️ 自動publish失敗: ${result.message}\n設定ページで手動更新してください`, 'error')
+      showHomeToast(`⚠️ 公開の更新に失敗: ${result.message}`, 'error')
     }
   }
 
