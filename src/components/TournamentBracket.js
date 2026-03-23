@@ -55,7 +55,10 @@ export function renderTournamentBracket(container) {
     attachBracketEvents(container, rounds, participants, totalRounds)
   }
 
-  store.subscribe(render)
+  if (container._unsubscribeStore) {
+    container._unsubscribeStore()
+  }
+  container._unsubscribeStore = store.subscribe(render)
   render()
 }
 

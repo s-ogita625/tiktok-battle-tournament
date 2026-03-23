@@ -44,11 +44,13 @@ export function renderViewerApp(container) {
         </aside>
 
         <!-- メイン：選択された大会の詳細 -->
-        <main class="viewer-main" id="viewer-main">
-          ${renderTournamentDetail(allTournaments[0])}
-        </main>
+        <main class="viewer-main" id="viewer-main"></main>
       </div>
     `
+
+    // 最初の大会を表示
+    const mainEl = container.querySelector('#viewer-main')
+    renderTournamentDetail(mainEl, allTournaments[0])
 
     // サイドバーの大会ボタン切り替え
     container.querySelectorAll('.viewer-tournament-btn').forEach(btn => {
@@ -57,7 +59,7 @@ export function renderViewerApp(container) {
         btn.classList.add('active')
         const idx = Number(btn.dataset.tournamentIdx)
         const main = container.querySelector('#viewer-main')
-        if (main) main.innerHTML = renderTournamentDetail(allTournaments[idx])
+        if (main) renderTournamentDetail(main, allTournaments[idx])
       })
     })
   }
@@ -67,12 +69,12 @@ export function renderViewerApp(container) {
 }
 
 // ──────────────────────────────────────────────────────
-//  大会詳細レンダリング
+//  大会詳細レンダリング（container DOM要素に直接描画）
 // ──────────────────────────────────────────────────────
 
-function renderTournamentDetail(t) {
-  if (!t) return ''
-  const { title, participants, groups, tournamentBracket, settings } = t
+function renderTournamentDetail(container, t) {
+  if (!t) { container.innerHTML = ''; return }
+  const { title, participants, groups, tournamentBracket } = t
   const isActive = t.stage !== 'finished'
 
   const tabs = [
@@ -81,7 +83,7 @@ function renderTournamentDetail(t) {
     { id: 'tournament',   label: '🏆 トーナメント', show: !!tournamentBracket }
   ].filter(tab => tab.show)
 
-  return `
+  container.innerHTML = `
     <div class="viewer-detail">
       <div class="viewer-detail-header">
         <h1 class="viewer-detail-title">${escHtml(title || '無題の大会')}</h1>
@@ -111,22 +113,19 @@ function renderTournamentDetail(t) {
         ${renderBracketView(tournamentBracket, participants || [])}
       </div>
     </div>
-
-    <script>
-      (function() {
-        const tabs = document.querySelectorAll('.viewer-tab')
-        tabs.forEach(tab => {
-          tab.addEventListener('click', () => {
-            tabs.forEach(t => t.classList.remove('active'))
-            tab.classList.add('active')
-            document.querySelectorAll('.viewer-tab-content').forEach(c => c.style.display = 'none')
-            const target = document.getElementById('vtab-' + tab.dataset.vtab)
-            if (target) target.style.display = ''
-          })
-        })
-      })()
-    </script>
   `
+
+  // タブ切り替えイベントをJSで登録（innerHTML内の<script>は実行されないため）
+  const tabBtns = container.querySelectorAll('.viewer-tab')
+  tabBtns.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabBtns.forEach(t => t.classList.remove('active'))
+      tab.classList.add('active')
+      container.querySelectorAll('.viewer-tab-content').forEach(c => c.style.display = 'none')
+      const target = container.querySelector('#vtab-' + tab.dataset.vtab)
+      if (target) target.style.display = ''
+    })
+  })
 }
 
 // ──────────────────────────────────────────────────────

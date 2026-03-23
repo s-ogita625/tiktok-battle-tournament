@@ -222,7 +222,10 @@ export function renderNoticeBoard(container) {
     })
   }
 
-  store.subscribe(render)
+  if (container._unsubscribeStore) {
+    container._unsubscribeStore()
+  }
+  container._unsubscribeStore = store.subscribe(render)
   render()
 }
 

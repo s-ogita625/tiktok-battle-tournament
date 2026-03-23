@@ -65,7 +65,11 @@ export function renderGroupStage(container) {
     })
   }
 
-  store.subscribe(render)
+  // 以前に登録したリスナーがあれば先に解除（ページ再描画時の重複防止）
+  if (container._unsubscribeStore) {
+    container._unsubscribeStore()
+  }
+  container._unsubscribeStore = store.subscribe(render)
   render()
 }
 
