@@ -1,73 +1,85 @@
 /**
  * ViewerApp.js — 閲覧専用（読み取り専用）ページ
- * localStorage のデータを表示するだけ。編集・操作は一切できない。
+ * /tournament-data.json（GitHubにpushされた公開データ）を fetch して表示。
+ * localStorageは使用しない。どのデバイスからでも同じデータが見える。
  */
-import { store } from '../data/store.js'
 import { getRoundName } from '../services/tournamentService.js'
 import { formatDate } from '../utils/dateUtils.js'
 import { convertImageUrl } from './ParticipantList.js'
 
-export function renderViewerApp(container) {
-  function render() {
-    const { currentTournament, tournaments } = store.getState()
+export async function renderViewerApp(container) {
+  // ローディング表示
+  container.innerHTML = `
+    <div class="viewer-empty">
+      <div class="viewer-empty-icon" style="font-size:2.5rem">⏳</div>
+      <div class="viewer-empty-title" style="font-size:1rem;font-weight:600">読み込み中...</div>
+    </div>
+  `
 
-    // 表示対象：isPublic=true の大会のみ（閲覧ページ）
-    const allTournaments = [
-      ...(currentTournament ? [currentTournament] : []),
-      ...tournaments
-    ].filter(t => t.isPublic)
-
-    if (allTournaments.length === 0) {
-      container.innerHTML = `
-        <div class="viewer-empty">
-          <div class="viewer-empty-icon">🏆</div>
-          <div class="viewer-empty-title">公開中の大会情報がありません</div>
-          <div class="viewer-empty-desc">管理者が大会を公開するとここに表示されます</div>
-        </div>
-      `
-      return
-    }
-
+  let allTournaments = []
+  try {
+    // キャッシュを避けるためタイムスタンプを付与
+    const res = await fetch(`/tournament-data.json?t=${Date.now()}`)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data = await res.json()
+    allTournaments = (data.tournaments || []).filter(t => t.isPublic !== false)
+  } catch (e) {
     container.innerHTML = `
-      <div class="viewer-layout">
-        <!-- サイドバー：大会一覧 -->
-        <aside class="viewer-sidebar">
-          <div class="viewer-sidebar-title">大会一覧</div>
-          <div class="viewer-sidebar-list">
-            ${allTournaments.map((t, i) => `
-              <button class="viewer-tournament-btn ${i === 0 ? 'active' : ''}"
-                      data-tournament-idx="${i}">
-                ${currentTournament && t.id === currentTournament.id
-                  ? `<span class="viewer-active-dot"></span>` : ''}
-                ${escHtml(t.title || '無題の大会')}
-              </button>
-            `).join('')}
-          </div>
-        </aside>
-
-        <!-- メイン：選択された大会の詳細 -->
-        <main class="viewer-main" id="viewer-main"></main>
+      <div class="viewer-empty">
+        <div class="viewer-empty-icon">⚠️</div>
+        <div class="viewer-empty-title">データの読み込みに失敗しました</div>
+        <div class="viewer-empty-desc">${e.message}</div>
       </div>
     `
-
-    // 最初の大会を表示
-    const mainEl = container.querySelector('#viewer-main')
-    renderTournamentDetail(mainEl, allTournaments[0])
-
-    // サイドバーの大会ボタン切り替え
-    container.querySelectorAll('.viewer-tournament-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        container.querySelectorAll('.viewer-tournament-btn').forEach(b => b.classList.remove('active'))
-        btn.classList.add('active')
-        const idx = Number(btn.dataset.tournamentIdx)
-        const main = container.querySelector('#viewer-main')
-        if (main) renderTournamentDetail(main, allTournaments[idx])
-      })
-    })
+    return
   }
 
-  store.subscribe(render)
-  render()
+  if (allTournaments.length === 0) {
+    container.innerHTML = `
+      <div class="viewer-empty">
+        <div class="viewer-empty-icon">🏆</div>
+        <div class="viewer-empty-title">公開中の大会情報がありません</div>
+        <div class="viewer-empty-desc">管理者が大会を公開するとここに表示されます</div>
+      </div>
+    `
+    return
+  }
+
+  container.innerHTML = `
+    <div class="viewer-layout">
+      <!-- サイドバー：大会一覧 -->
+      <aside class="viewer-sidebar">
+        <div class="viewer-sidebar-title">大会一覧</div>
+        <div class="viewer-sidebar-list">
+          ${allTournaments.map((t, i) => `
+            <button class="viewer-tournament-btn ${i === 0 ? 'active' : ''}"
+                    data-tournament-idx="${i}">
+              ${t.stage !== 'finished' ? `<span class="viewer-active-dot"></span>` : ''}
+              ${escHtml(t.title || '無題の大会')}
+            </button>
+          `).join('')}
+        </div>
+      </aside>
+
+      <!-- メイン：選択された大会の詳細 -->
+      <main class="viewer-main" id="viewer-main"></main>
+    </div>
+  `
+
+  // 最初の大会を表示
+  const mainEl = container.querySelector('#viewer-main')
+  renderTournamentDetail(mainEl, allTournaments[0])
+
+  // サイドバーの大会ボタン切り替え
+  container.querySelectorAll('.viewer-tournament-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      container.querySelectorAll('.viewer-tournament-btn').forEach(b => b.classList.remove('active'))
+      btn.classList.add('active')
+      const idx = Number(btn.dataset.tournamentIdx)
+      const main = container.querySelector('#viewer-main')
+      if (main) renderTournamentDetail(main, allTournaments[idx])
+    })
+  })
 }
 
 // ──────────────────────────────────────────────────────

@@ -1,5 +1,6 @@
 import { store } from '../data/store.js'
 import { exportToJson, importFromJson } from '../utils/exportUtils.js'
+import { publishTournamentData, getSavedToken, saveToken } from '../utils/publishUtils.js'
 
 export function renderSettings(container) {
   function render() {
@@ -70,6 +71,33 @@ export function renderSettings(container) {
         </div>
 
         <div class="settings-section">
+          <h2 class="settings-section-title">🌐 閲覧ページへ公開</h2>
+          <p style="font-size:0.8rem;color:var(--color-text-muted);margin-bottom:12px;line-height:1.6">
+            「公開中」に設定した大会を閲覧ページ（スマホ等）に反映するには、<br>
+            GitHub Token を設定して「公開データを更新」ボタンを押してください。<br>
+            <span style="color:var(--color-text-dim);font-size:0.75rem">
+              ※ Token は <strong>GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)</strong><br>
+              で発行してください（repoスコープにチェック）
+            </span>
+          </p>
+          <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:8px">
+            <label class="form-label">GitHub Personal Access Token</label>
+            <div style="display:flex;gap:8px;width:100%">
+              <input class="form-input" id="github-token-input" type="password"
+                     placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                     value="${escHtml(getSavedToken())}"
+                     style="flex:1;font-family:monospace;font-size:0.8rem" />
+              <button class="btn btn-secondary btn-sm" id="toggle-token-vis" type="button">👁</button>
+              <button class="btn btn-secondary btn-sm" id="save-token-btn" type="button">保存</button>
+            </div>
+          </div>
+          <div class="data-actions" style="margin-top:12px">
+            <button class="btn btn-primary" id="publish-btn">🚀 公開データを更新（Vercelへ反映）</button>
+          </div>
+          <div id="publish-result" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;font-size:0.82rem;line-height:1.6;white-space:pre-line"></div>
+        </div>
+
+        <div class="settings-section">
           <h2 class="settings-section-title">💾 データ管理</h2>
           <div class="data-actions">
             <button class="btn btn-secondary" id="export-btn">⬇️ データをエクスポート (JSON)</button>
@@ -122,6 +150,50 @@ export function renderSettings(container) {
     container.querySelector('#add-time-btn')?.addEventListener('click', () => {
       const times = [...(store.getState().currentTournament?.settings.defaultBattleTimes || []), '20:00']
       store.updateTournament(ct => ({ settings: { ...ct.settings, defaultBattleTimes: times } }))
+    })
+
+    // GitHub Token 表示切り替え
+    container.querySelector('#toggle-token-vis')?.addEventListener('click', () => {
+      const input = container.querySelector('#github-token-input')
+      if (!input) return
+      input.type = input.type === 'password' ? 'text' : 'password'
+    })
+
+    // GitHub Token 保存
+    container.querySelector('#save-token-btn')?.addEventListener('click', () => {
+      const val = container.querySelector('#github-token-input')?.value || ''
+      saveToken(val)
+      showToast('Tokenを保存しました', 'success')
+    })
+
+    // 公開データ更新
+    container.querySelector('#publish-btn')?.addEventListener('click', async () => {
+      const token = container.querySelector('#github-token-input')?.value.trim() || getSavedToken()
+      if (!token) { showToast('GitHub Tokenを入力してください', 'error'); return }
+      saveToken(token)
+
+      const { currentTournament, tournaments } = store.getState()
+      const all = [
+        ...(currentTournament ? [currentTournament] : []),
+        ...tournaments
+      ]
+      const publicOnes = all.filter(t => t.isPublic)
+
+      const btn = container.querySelector('#publish-btn')
+      const resultEl = container.querySelector('#publish-result')
+      btn.disabled = true
+      btn.textContent = '⏳ 更新中...'
+      resultEl.style.display = 'none'
+
+      const result = await publishTournamentData(publicOnes, token)
+
+      btn.disabled = false
+      btn.textContent = '🚀 公開データを更新（Vercelへ反映）'
+      resultEl.style.display = ''
+      resultEl.style.background = result.ok ? 'rgba(76,175,80,0.1)' : 'rgba(244,67,54,0.1)'
+      resultEl.style.border = result.ok ? '1px solid rgba(76,175,80,0.3)' : '1px solid rgba(244,67,54,0.3)'
+      resultEl.style.color = result.ok ? 'var(--color-success)' : 'var(--color-danger)'
+      resultEl.textContent = result.message
     })
 
     // エクスポート
