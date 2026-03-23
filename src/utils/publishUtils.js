@@ -38,9 +38,8 @@ export function saveToken(token) {
  */
 export async function publishTournamentData(tournaments, token) {
   if (!token) return { ok: false, message: 'GitHub Tokenが設定されていません' }
-  if (!tournaments || tournaments.length === 0) {
-    return { ok: false, message: '公開する大会がありません（管理画面で「🌐 公開中」に設定してください）' }
-  }
+  // tournaments が空でも「全て非公開」として空配列を push できるようにする
+  if (!tournaments) tournaments = []
 
   // 売上情報を除いた公開用データを生成
   const publicData = {

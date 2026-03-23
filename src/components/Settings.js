@@ -177,7 +177,7 @@ export function renderSettings(container) {
         ...(currentTournament ? [currentTournament] : []),
         ...tournaments
       ]
-      const publicOnes = all.filter(t => t.isPublic)
+      const publicOnes = all.filter(t => t.isPublic === true)
 
       const btn = container.querySelector('#publish-btn')
       const resultEl = container.querySelector('#publish-result')

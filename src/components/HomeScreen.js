@@ -1,5 +1,6 @@
 import { store, defaultTournament } from '../data/store.js'
 import { generateId } from '../utils/exportUtils.js'
+import { publishTournamentData, getSavedToken } from '../utils/publishUtils.js'
 
 export function renderHomeScreen(container, onEnterTournament) {
   function render() {
@@ -184,23 +185,56 @@ export function renderHomeScreen(container, onEnterTournament) {
     })
 
     // 公開/非公開トグル（進行中の大会）
-    container.querySelector('#toggle-active-public')?.addEventListener('click', () => {
+    container.querySelector('#toggle-active-public')?.addEventListener('click', async () => {
       const ct = store.getState().currentTournament
       if (!ct) return
-      store.updateTournament({ isPublic: !ct.isPublic })
+      const newIsPublic = !ct.isPublic
+      store.updateTournament({ isPublic: newIsPublic })
+      await autoPublishIfTokenSaved()
     })
 
     // 公開/非公開トグル（過去大会）
     container.querySelectorAll('[data-toggle-public]').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const id = btn.dataset.togglePublic
         const { tournaments } = store.getState()
         const t = tournaments.find(x => x.id === id)
         if (!t) return
         const updated = tournaments.map(x => x.id === id ? { ...x, isPublic: !x.isPublic } : x)
         store.update({ tournaments: updated })
+        await autoPublishIfTokenSaved()
       })
     })
+  }
+
+  /**
+   * GitHub Token が保存済みなら公開中の大会を自動的に publish する
+   * トークン未設定の場合は静かにスキップ（Settings で設定してもらう）
+   */
+  async function autoPublishIfTokenSaved() {
+    const token = getSavedToken()
+    if (!token) return // Token 未設定時はスキップ
+
+    const { currentTournament, tournaments } = store.getState()
+    const all = [
+      ...(currentTournament ? [currentTournament] : []),
+      ...tournaments
+    ]
+    const publicOnes = all.filter(t => t.isPublic === true)
+
+    if (publicOnes.length === 0) {
+      // 全て非公開になった場合も空データを push する
+      const result = await publishTournamentData([], token)
+      if (result.ok) showHomeToast('公開データを更新しました（全て非公開）', 'info')
+      return
+    }
+
+    const result = await publishTournamentData(publicOnes, token)
+    if (result.ok) {
+      showHomeToast(`✅ ${publicOnes.length}件の大会を公開しました（Vercel反映まで約1〜2分）`, 'success')
+    } else {
+      showHomeToast(`⚠️ 自動publish失敗: ${result.message}\n設定ページで手動更新してください`, 'error')
+    }
   }
 
   store.subscribe(render)
@@ -276,4 +310,18 @@ function renderTournamentCard(t) {
 
 function escHtml(str) {
   return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+function showHomeToast(message, type = 'info') {
+  let toastContainer = document.querySelector('.toast-container')
+  if (!toastContainer) {
+    toastContainer = document.createElement('div')
+    toastContainer.className = 'toast-container'
+    document.body.appendChild(toastContainer)
+  }
+  const toast = document.createElement('div')
+  toast.className = `toast ${type}`
+  toast.textContent = message
+  toastContainer.appendChild(toast)
+  setTimeout(() => toast.remove(), 4000)
 }

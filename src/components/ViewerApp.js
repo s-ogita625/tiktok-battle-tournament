@@ -1,11 +1,36 @@
 /**
  * ViewerApp.js — 閲覧専用（読み取り専用）ページ
- * /tournament-data.json（GitHubにpushされた公開データ）を fetch して表示。
- * localStorageは使用しない。どのデバイスからでも同じデータが見える。
+ *
+ * データ取得の優先順位:
+ *   1. /tournament-data.json (GitHub push 済みの共有データ) から fetch
+ *   2. 取得できた場合でも tournaments が空なら localStorage をフォールバックとして使用
+ *      → 管理者が同じブラウザで閲覧ページを開いたときも即座に確認できる
+ *
+ * こうすることで:
+ *   - 同じPC: GitHub publish 前でも公開フラグが立っていれば見える
+ *   - スマホ等別デバイス: GitHub publish 後1〜2分で見える
  */
 import { getRoundName } from '../services/tournamentService.js'
 import { formatDate } from '../utils/dateUtils.js'
 import { convertImageUrl } from './ParticipantList.js'
+
+const LOCAL_STORAGE_KEY = 'tbt_state'
+
+/** localStorage から公開中の大会を取得する（フォールバック用） */
+function getLocalPublicTournaments() {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY)
+    if (!raw) return []
+    const state = JSON.parse(raw)
+    const all = [
+      ...(state.currentTournament ? [state.currentTournament] : []),
+      ...(state.tournaments || [])
+    ]
+    return all.filter(t => t.isPublic === true)
+  } catch {
+    return []
+  }
+}
 
 export async function renderViewerApp(container) {
   // ローディング表示
@@ -17,21 +42,31 @@ export async function renderViewerApp(container) {
   `
 
   let allTournaments = []
+  let sourceLabel = ''
+
+  // 1. /tournament-data.json を fetch（キャッシュ回避）
   try {
-    // キャッシュを避けるためタイムスタンプを付与
     const res = await fetch(`/tournament-data.json?t=${Date.now()}`)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data = await res.json()
-    allTournaments = (data.tournaments || []).filter(t => t.isPublic !== false)
+    // isPublic が明示的に true のものだけ表示
+    const fromJson = (data.tournaments || []).filter(t => t.isPublic === true)
+    if (fromJson.length > 0) {
+      allTournaments = fromJson
+      sourceLabel = 'json'
+    }
   } catch (e) {
-    container.innerHTML = `
-      <div class="viewer-empty">
-        <div class="viewer-empty-icon">⚠️</div>
-        <div class="viewer-empty-title">データの読み込みに失敗しました</div>
-        <div class="viewer-empty-desc">${e.message}</div>
-      </div>
-    `
-    return
+    // fetch 失敗時はコンソールに記録してフォールバックへ
+    console.warn('[ViewerApp] /tournament-data.json fetch失敗:', e.message)
+  }
+
+  // 2. JSON が空 or fetch 失敗の場合 → localStorage フォールバック
+  if (allTournaments.length === 0) {
+    const fromLocal = getLocalPublicTournaments()
+    if (fromLocal.length > 0) {
+      allTournaments = fromLocal
+      sourceLabel = 'local'
+    }
   }
 
   if (allTournaments.length === 0) {
@@ -39,7 +74,7 @@ export async function renderViewerApp(container) {
       <div class="viewer-empty">
         <div class="viewer-empty-icon">🏆</div>
         <div class="viewer-empty-title">公開中の大会情報がありません</div>
-        <div class="viewer-empty-desc">管理者が大会を公開するとここに表示されます</div>
+        <div class="viewer-empty-desc">管理者が大会を「公開中」に設定すると表示されます</div>
       </div>
     `
     return
