@@ -10,10 +10,7 @@ import { renderNoticeBoard } from './components/NoticeBoard.js'
 import { renderSettings } from './components/Settings.js'
 import { assignGroups } from './services/groupService.js'
 
-const appRoot       = document.getElementById('app')
-const navContainer  = document.getElementById('nav-container')
-const mainContent   = document.getElementById('main-content')
-const homeContainer = document.getElementById('home-container')
+const appRoot = document.getElementById('app')
 
 // =============================================
 //  認証ガード: 未ログインの場合はログイン画面を表示
@@ -21,6 +18,20 @@ const homeContainer = document.getElementById('home-container')
 requireAuth(appRoot, initApp)
 
 function initApp() {
+  // ログイン後に #app の中身がクリアされているので
+  // admin.html の構造を復元してから取得する
+  if (!document.getElementById('home-container')) {
+    appRoot.innerHTML = `
+      <div id="home-container"></div>
+      <header class="app-header" id="nav-container" style="display:none"></header>
+      <main id="main-content" class="main-content" style="display:none"></main>
+    `
+  }
+
+  const navContainer  = document.getElementById('nav-container')
+  const mainContent   = document.getElementById('main-content')
+  const homeContainer = document.getElementById('home-container')
+
   // ナビバーにログアウト + 閲覧ページリンクを追加
   addHeaderActions()
 
@@ -64,6 +75,73 @@ function initApp() {
       mainContent.style.display   = ''
     }
   })
+
+  // =============================================
+  //  内部関数: 画面切り替え・ページ描画
+  // =============================================
+  function switchToHome() {
+    store.update({ appStage: 'home' })
+    homeContainer.style.display = ''
+    navContainer.style.display  = 'none'
+    mainContent.style.display   = 'none'
+    mainContent.innerHTML       = ''
+  }
+
+  function switchToEdit() {
+    store.update({ appStage: 'edit' })
+    homeContainer.style.display = 'none'
+    navContainer.style.display  = ''
+    mainContent.style.display   = ''
+    const stage = store.getState().currentTournament?.stage || 'participants'
+    renderPage(stage)
+  }
+
+  function renderPage(stage) {
+    mainContent.innerHTML = ''
+
+    if (stage === 'settings') {
+      renderSettings(mainContent)
+    } else if (stage === 'participants') {
+      renderParticipantsPage()
+    } else if (stage === 'groups') {
+      renderGroupStage(mainContent)
+    } else if (stage === 'tournament') {
+      renderTournamentBracket(mainContent)
+    } else if (stage === 'notice') {
+      renderNoticeBoard(mainContent)
+    }
+  }
+
+  function renderParticipantsPage() {
+    mainContent.innerHTML = `
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">参加者管理</h1>
+          <p class="page-subtitle">バトルに参加する選手を登録してください</p>
+        </div>
+      </div>
+      <div class="participants-layout">
+        <div id="form-area"></div>
+        <div id="list-area"></div>
+      </div>
+    `
+
+    const formArea = mainContent.querySelector('#form-area')
+    const listArea = mainContent.querySelector('#list-area')
+
+    renderParticipantForm(formArea, null)
+    renderParticipantList(listArea, formArea)
+
+    listArea.addEventListener('assign-groups', () => {
+      const ct = store.getState().currentTournament
+      if (!ct || ct.participants.length < 2) return
+
+      const groups = assignGroups(ct.participants, ct.settings)
+      store.updateTournament({ groups, stage: 'groups' })
+      renderPage('groups')
+      showToast(`${groups.length}グループに割り振りました！`, 'success')
+    })
+  }
 }
 
 // =============================================
@@ -88,76 +166,6 @@ function addHeaderActions() {
       clearAuthentication()
       location.reload()
     }
-  })
-}
-
-// =============================================
-//  画面切り替え
-// =============================================
-function switchToHome() {
-  store.update({ appStage: 'home' })
-  homeContainer.style.display = ''
-  navContainer.style.display  = 'none'
-  mainContent.style.display   = 'none'
-  mainContent.innerHTML       = ''
-}
-
-function switchToEdit() {
-  store.update({ appStage: 'edit' })
-  homeContainer.style.display = 'none'
-  navContainer.style.display  = ''
-  mainContent.style.display   = ''
-  const stage = store.getState().currentTournament?.stage || 'participants'
-  renderPage(stage)
-}
-
-// =============================================
-//  ページ描画
-// =============================================
-function renderPage(stage) {
-  mainContent.innerHTML = ''
-
-  if (stage === 'settings') {
-    renderSettings(mainContent)
-  } else if (stage === 'participants') {
-    renderParticipantsPage()
-  } else if (stage === 'groups') {
-    renderGroupStage(mainContent)
-  } else if (stage === 'tournament') {
-    renderTournamentBracket(mainContent)
-  } else if (stage === 'notice') {
-    renderNoticeBoard(mainContent)
-  }
-}
-
-function renderParticipantsPage() {
-  mainContent.innerHTML = `
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">参加者管理</h1>
-        <p class="page-subtitle">バトルに参加する選手を登録してください</p>
-      </div>
-    </div>
-    <div class="participants-layout">
-      <div id="form-area"></div>
-      <div id="list-area"></div>
-    </div>
-  `
-
-  const formArea = mainContent.querySelector('#form-area')
-  const listArea = mainContent.querySelector('#list-area')
-
-  renderParticipantForm(formArea, null)
-  renderParticipantList(listArea, formArea)
-
-  listArea.addEventListener('assign-groups', () => {
-    const ct = store.getState().currentTournament
-    if (!ct || ct.participants.length < 2) return
-
-    const groups = assignGroups(ct.participants, ct.settings)
-    store.updateTournament({ groups, stage: 'groups' })
-    renderPage('groups')
-    showToast(`${groups.length}グループに割り振りました！`, 'success')
   })
 }
 
