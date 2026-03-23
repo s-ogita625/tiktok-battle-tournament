@@ -46,9 +46,9 @@ export function renderParticipantForm(container, editingId = null) {
 
     let html = `
       <div class="date-picker-header">
-        <button class="date-picker-nav" id="${prefix}-prev">‹</button>
+        <button type="button" class="date-picker-nav" id="${prefix}-prev">‹</button>
         <span class="date-picker-month">${year}年${mth + 1}月</span>
-        <button class="date-picker-nav" id="${prefix}-next">›</button>
+        <button type="button" class="date-picker-nav" id="${prefix}-next">›</button>
       </div>
       <div class="date-picker-grid">
         ${dayLabels.map(d => `<div class="date-picker-day-label">${d}</div>`).join('')}
@@ -71,74 +71,6 @@ export function renderParticipantForm(container, editingId = null) {
         <div class="legend-item"><div class="legend-dot unavailable"></div>バトル不可</div>
       </div>`
     return html
-  }
-
-  function render() {
-    container.innerHTML = `
-      <div class="participant-form-card">
-        <h2 class="card-title" style="margin-bottom:20px">${editing ? '参加者を編集' : '参加者を追加'}</h2>
-        <form id="participant-form" class="form-grid">
-
-          <div class="form-group">
-            <label class="form-label required">名前</label>
-            <input class="form-input" id="f-name" type="text" placeholder="例: 山田太郎" value="${escHtml(formData.name)}" maxlength="30" required />
-          </div>
-
-          <div class="form-group">
-            <label class="form-label required">売上（パワーバランス）</label>
-            <input class="form-input" id="f-sales" type="number" placeholder="例: 1500000" value="${formData.sales}" min="0" required />
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">TikTokアカウントURL</label>
-            <input class="form-input" id="f-tiktok" type="url" placeholder="https://www.tiktok.com/@username" value="${escHtml(formData.tiktokUrl)}" />
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">プロフィール画像URL</label>
-            <input class="form-input" id="f-img" type="text" placeholder="https://... またはGoogleドライブ共有リンク" value="${escHtml(formData.profileImageUrl)}" />
-            <span class="form-hint">TikTokのURLまたはGoogleドライブの共有リンクを貼り付けてください</span>
-            <div id="img-preview-wrap" style="margin-top:8px;display:flex;align-items:center;gap:10px">
-              ${formData.profileImageUrl ? `<img id="img-preview" src="${escHtml(convertImageUrl(formData.profileImageUrl))}" style="width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid var(--color-border)" onerror="this.style.display='none'" alt="プレビュー" />` : ''}
-            </div>
-          </div>
-
-          <!-- グループ戦日程 -->
-          <div class="form-group">
-            <label class="form-label" style="color:var(--color-secondary)">⚔️ グループ戦 バトル日程</label>
-            <div class="date-picker-container">
-              <div id="cal-group">${renderCalendar(currentGroupMonth, 'availableDates', 'unavailableDates', 'grp')}</div>
-            </div>
-            <div style="display:flex;gap:12px;margin-top:6px;font-size:0.75rem;color:var(--color-text-muted)">
-              <span>左クリック: 可能 / 右クリック: 不可 / 再クリック: クリア</span>
-            </div>
-            <div id="preview-group" style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap"></div>
-          </div>
-
-          <!-- トーナメント戦日程 -->
-          <div class="form-group">
-            <label class="form-label" style="color:#ffd700">🏆 トーナメント戦 バトル日程</label>
-            <div class="date-picker-container">
-              <div id="cal-tournament">${renderCalendar(currentTournamentMonth, 'tournamentAvailableDates', 'tournamentUnavailableDates', 'trn')}</div>
-            </div>
-            <div style="display:flex;gap:12px;margin-top:6px;font-size:0.75rem;color:var(--color-text-muted)">
-              <span>左クリック: 可能 / 右クリック: 不可 / 再クリック: クリア</span>
-            </div>
-            <div id="preview-tournament" style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap"></div>
-          </div>
-
-          <div style="display:flex;gap:8px;padding-top:4px">
-            ${editing ? `<button type="button" id="cancel-edit-btn" class="btn btn-secondary" style="flex:1">キャンセル</button>` : ''}
-            <button type="submit" class="btn btn-primary" style="flex:2">${editing ? '保存する' : '追加する'}</button>
-          </div>
-        </form>
-      </div>
-    `
-
-    attachCalendarEvents('cal-group', 'availableDates', 'unavailableDates', 'grp', currentGroupMonth, 'preview-group')
-    attachCalendarEvents('cal-tournament', 'tournamentAvailableDates', 'tournamentUnavailableDates', 'trn', currentTournamentMonth, 'preview-tournament')
-    renderPreview('availableDates', 'unavailableDates', 'preview-group')
-    renderPreview('tournamentAvailableDates', 'tournamentUnavailableDates', 'preview-tournament')
   }
 
   function renderPreview(availField, unavailField, previewId) {
@@ -205,72 +137,148 @@ export function renderParticipantForm(container, editingId = null) {
     })
   }
 
-  render()
+  // render() の中にすべてのイベント登録をまとめる
+  function render() {
+    container.innerHTML = `
+      <div class="participant-form-card">
+        <h2 class="card-title" style="margin-bottom:20px">${editing ? '参加者を編集' : '参加者を追加'}</h2>
+        <form id="participant-form" class="form-grid">
 
-  // 画像URLの入力に応じてプレビューをリアルタイム更新
-  container.querySelector('#f-img')?.addEventListener('input', (e) => {
-    const wrap = container.querySelector('#img-preview-wrap')
-    if (!wrap) return
-    const raw = e.target.value.trim()
-    const src = convertImageUrl(raw)
-    if (src) {
-      let img = wrap.querySelector('#img-preview')
-      if (!img) {
-        img = document.createElement('img')
-        img.id = 'img-preview'
-        img.style.cssText = 'width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid var(--color-border)'
-        img.alt = 'プレビュー'
-        img.onerror = () => { img.style.display = 'none' }
-        wrap.appendChild(img)
+          <div class="form-group">
+            <label class="form-label required">名前</label>
+            <input class="form-input" id="f-name" type="text" placeholder="例: 山田太郎" value="${escHtml(formData.name)}" maxlength="30" required />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label required">売上（パワーバランス）</label>
+            <input class="form-input" id="f-sales" type="number" placeholder="例: 1500000" value="${formData.sales}" min="0" required />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">TikTokアカウントURL</label>
+            <input class="form-input" id="f-tiktok" type="url" placeholder="https://www.tiktok.com/@username" value="${escHtml(formData.tiktokUrl)}" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">プロフィール画像URL</label>
+            <input class="form-input" id="f-img" type="text" placeholder="https://... またはGoogleドライブ共有リンク" value="${escHtml(formData.profileImageUrl)}" />
+            <span class="form-hint">TikTokのURLまたはGoogleドライブの共有リンクを貼り付けてください</span>
+            <div id="img-preview-wrap" style="margin-top:8px;display:flex;align-items:center;gap:10px">
+              ${formData.profileImageUrl ? `<img id="img-preview" src="${escHtml(convertImageUrl(formData.profileImageUrl))}" style="width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid var(--color-border)" onerror="this.style.display='none'" alt="プレビュー" />` : ''}
+            </div>
+          </div>
+
+          <!-- グループ戦日程 -->
+          <div class="form-group">
+            <label class="form-label" style="color:var(--color-secondary)">⚔️ グループ戦 バトル日程</label>
+            <div class="date-picker-container">
+              <div id="cal-group">${renderCalendar(currentGroupMonth, 'availableDates', 'unavailableDates', 'grp')}</div>
+            </div>
+            <div style="display:flex;gap:12px;margin-top:6px;font-size:0.75rem;color:var(--color-text-muted)">
+              <span>左クリック: 可能 / 右クリック: 不可 / 再クリック: クリア</span>
+            </div>
+            <div id="preview-group" style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap"></div>
+          </div>
+
+          <!-- トーナメント戦日程 -->
+          <div class="form-group">
+            <label class="form-label" style="color:#ffd700">🏆 トーナメント戦 バトル日程</label>
+            <div class="date-picker-container">
+              <div id="cal-tournament">${renderCalendar(currentTournamentMonth, 'tournamentAvailableDates', 'tournamentUnavailableDates', 'trn')}</div>
+            </div>
+            <div style="display:flex;gap:12px;margin-top:6px;font-size:0.75rem;color:var(--color-text-muted)">
+              <span>左クリック: 可能 / 右クリック: 不可 / 再クリック: クリア</span>
+            </div>
+            <div id="preview-tournament" style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap"></div>
+          </div>
+
+          <div style="display:flex;gap:8px;padding-top:4px">
+            ${editing ? `<button type="button" id="cancel-edit-btn" class="btn btn-secondary" style="flex:1">キャンセル</button>` : ''}
+            <button type="submit" class="btn btn-primary" style="flex:2">${editing ? '保存する' : '追加する'}</button>
+          </div>
+        </form>
+      </div>
+    `
+
+    attachCalendarEvents('cal-group', 'availableDates', 'unavailableDates', 'grp', currentGroupMonth, 'preview-group')
+    attachCalendarEvents('cal-tournament', 'tournamentAvailableDates', 'tournamentUnavailableDates', 'trn', currentTournamentMonth, 'preview-tournament')
+    renderPreview('availableDates', 'unavailableDates', 'preview-group')
+    renderPreview('tournamentAvailableDates', 'tournamentUnavailableDates', 'preview-tournament')
+
+    // 画像URLのリアルタイムプレビュー
+    container.querySelector('#f-img')?.addEventListener('input', (e) => {
+      const wrap = container.querySelector('#img-preview-wrap')
+      if (!wrap) return
+      const raw = e.target.value.trim()
+      const src = convertImageUrl(raw)
+      if (src) {
+        let img = wrap.querySelector('#img-preview')
+        if (!img) {
+          img = document.createElement('img')
+          img.id = 'img-preview'
+          img.style.cssText = 'width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid var(--color-border)'
+          img.alt = 'プレビュー'
+          img.onerror = () => { img.style.display = 'none' }
+          wrap.appendChild(img)
+        }
+        img.style.display = ''
+        img.src = src
+      } else {
+        const img = wrap.querySelector('#img-preview')
+        if (img) img.style.display = 'none'
       }
-      img.style.display = ''
-      img.src = src
-    } else {
-      const img = wrap.querySelector('#img-preview')
-      if (img) img.style.display = 'none'
-    }
-  })
+    })
 
-  const form = container.querySelector('#participant-form')
-  form.addEventListener('submit', (e) => {
-    e.preventDefault()
-    formData.name = container.querySelector('#f-name').value.trim()
-    formData.sales = Number(container.querySelector('#f-sales').value)
-    formData.tiktokUrl = container.querySelector('#f-tiktok').value.trim()
-    // Googleドライブ共有リンクを自動変換して保存
-    formData.profileImageUrl = convertImageUrl(container.querySelector('#f-img').value.trim())
+    // フォーム送信
+    const form = container.querySelector('#participant-form')
+    form.addEventListener('submit', (e) => {
+      e.preventDefault()
 
-    if (!formData.name || isNaN(formData.sales)) return
+      const nameVal  = container.querySelector('#f-name').value.trim()
+      const salesVal = Number(container.querySelector('#f-sales').value)
+      if (!nameVal || isNaN(salesVal)) return
 
-    if (editing) {
-      store.updateTournament(ct => ({
-        participants: ct.participants.map(p =>
-          p.id === editingId ? { ...p, ...formData } : p
-        )
-      }))
-      showToast('参加者を更新しました', 'success')
+      formData.name             = nameVal
+      formData.sales            = salesVal
+      formData.tiktokUrl        = container.querySelector('#f-tiktok').value.trim()
+      formData.profileImageUrl  = convertImageUrl(container.querySelector('#f-img').value.trim())
+
+      if (editing) {
+        store.updateTournament(ct => ({
+          participants: ct.participants.map(p =>
+            p.id === editingId ? { ...p, ...formData } : p
+          )
+        }))
+        showToast('参加者を更新しました', 'success')
+        container.dispatchEvent(new CustomEvent('edit-done'))
+      } else {
+        const participant = {
+          id: generateId(),
+          ...formData,
+          groupId: null,
+          createdAt: new Date().toISOString()
+        }
+        // storeを更新（これによりParticipantListのrenderが走る）
+        store.updateTournament(ct => ({ participants: [...ct.participants, participant] }))
+        showToast(`${formData.name} を追加しました`, 'success')
+
+        // formDataをリセットしてフォームを再描画
+        formData = {
+          name: '', sales: '', tiktokUrl: '', profileImageUrl: '',
+          availableDates: [], unavailableDates: [],
+          tournamentAvailableDates: [], tournamentUnavailableDates: []
+        }
+        render()
+      }
+    })
+
+    // キャンセルボタン
+    container.querySelector('#cancel-edit-btn')?.addEventListener('click', () => {
       container.dispatchEvent(new CustomEvent('edit-done'))
-    } else {
-      const participant = {
-        id: generateId(),
-        ...formData,
-        groupId: null,
-        createdAt: new Date().toISOString()
-      }
-      store.updateTournament(ct => ({ participants: [...ct.participants, participant] }))
-      showToast(`${formData.name} を追加しました`, 'success')
-      formData = {
-        name: '', sales: '', tiktokUrl: '', profileImageUrl: '',
-        availableDates: [], unavailableDates: [],
-        tournamentAvailableDates: [], tournamentUnavailableDates: []
-      }
-      render()
-    }
-  })
+    })
+  }
 
-  container.querySelector('#cancel-edit-btn')?.addEventListener('click', () => {
-    container.dispatchEvent(new CustomEvent('edit-done'))
-  })
+  render()
 }
 
 function escHtml(str) {
