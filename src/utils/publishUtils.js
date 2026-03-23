@@ -1,16 +1,30 @@
 /**
  * publishUtils.js
- * 公開データ（閲覧ページ用）を Vercel サーバーレス関数 (/api/publish) 経由で更新する。
+ * 公開データを Vercel サーバーレス関数 (/api/publish) 経由で GitHub Gist に保存する。
  *
  * 仕組み:
  *   1. 管理画面が「公開中」の大会を POST /api/publish に送信
- *   2. サーバー側 (api/publish.js) が環境変数の GITHUB_TOKEN を使って
- *      public/tournament-data.json を GitHub に push
- *   3. Vercel が自動デプロイ → 閲覧ページに反映（約1〜2分）
+ *   2. サーバー側 (api/publish.js) が環境変数 GITHUB_TOKEN の gist スコープを使って
+ *      GitHub Gist にデータを保存
+ *   3. 返ってきた Gist ID を localStorage に保存
+ *   4. 閲覧ページ (ViewerApp.js) が Gist の raw URL から直接データを取得
+ *      → Vercel の再デプロイは不要、即座に全デバイスに反映
  *
- * ブラウザ側に GitHub Token は不要。
- * どのデバイスからでも操作できる。
+ * 必要な GitHub Token のスコープ: gist のみ（repo 不要）
+ * Classic token で発行してください（Fine-grained token は Gist 非対応）
  */
+
+const GIST_ID_STORAGE_KEY = 'tbt_gist_id'
+
+/** 保存済み Gist ID を取得 */
+export function getSavedGistId() {
+  try { return localStorage.getItem(GIST_ID_STORAGE_KEY) || '' } catch { return '' }
+}
+
+/** Gist ID を localStorage に保存 */
+export function saveGistId(id) {
+  try { localStorage.setItem(GIST_ID_STORAGE_KEY, id) } catch {}
+}
 
 /**
  * 公開対象の大会データを /api/publish に POST する
@@ -30,10 +44,13 @@ export async function publishTournamentData(tournaments) {
     const data = await res.json().catch(() => ({}))
 
     if (res.ok && data.ok) {
+      // Gist ID を保存（次回から閲覧ページで自動参照）
+      if (data.gistId) {
+        saveGistId(data.gistId)
+      }
       return { ok: true, message: data.message || `✅ ${tournaments.length}件の大会を公開しました！` }
     }
 
-    // エラー時
     return {
       ok: false,
       message: data.message || `サーバーエラー (${res.status})`

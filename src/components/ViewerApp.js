@@ -2,19 +2,18 @@
  * ViewerApp.js — 閲覧専用（読み取り専用）ページ
  *
  * データ取得の優先順位:
- *   1. /tournament-data.json (GitHub push 済みの共有データ) から fetch
- *   2. 取得できた場合でも tournaments が空なら localStorage をフォールバックとして使用
- *      → 管理者が同じブラウザで閲覧ページを開いたときも即座に確認できる
- *
- * こうすることで:
- *   - 同じPC: GitHub publish 前でも公開フラグが立っていれば見える
- *   - スマホ等別デバイス: GitHub publish 後1〜2分で見える
+ *   1. GitHub Gist（/api/publish で保存した共有データ）から fetch
+ *      → スマホ等別デバイスで最新データを取得できる
+ *   2. Gist が未設定 or 取得失敗の場合 → localhost用: /tournament-data.json
+ *   3. それも空の場合 → localStorage フォールバック（同じブラウザのみ）
  */
 import { getRoundName } from '../services/tournamentService.js'
 import { formatDate } from '../utils/dateUtils.js'
 import { convertImageUrl } from './ParticipantList.js'
 
-const LOCAL_STORAGE_KEY = 'tbt_state'
+const LOCAL_STORAGE_KEY   = 'tbt_state'
+const GIST_ID_STORAGE_KEY = 'tbt_gist_id'
+const GIST_OWNER          = 's-ogita625'
 
 /** localStorage から公開中の大会を取得する（フォールバック用） */
 function getLocalPublicTournaments() {
@@ -32,6 +31,24 @@ function getLocalPublicTournaments() {
   }
 }
 
+/** Gist ID を取得（サーバー → localStorage の順で試みる） */
+async function resolveGistId() {
+  // まずサーバーの /api/gist-id を確認（全デバイスで共通の ID を取得）
+  try {
+    const res = await fetch(`/api/gist-id?t=${Date.now()}`)
+    if (res.ok) {
+      const data = await res.json()
+      if (data.gistId) {
+        // 取得した ID を localStorage にキャッシュ
+        try { localStorage.setItem(GIST_ID_STORAGE_KEY, data.gistId) } catch {}
+        return data.gistId
+      }
+    }
+  } catch { /* 無視 */ }
+  // フォールバック：localStorage のキャッシュ
+  try { return localStorage.getItem(GIST_ID_STORAGE_KEY) || '' } catch { return '' }
+}
+
 export async function renderViewerApp(container) {
   // ローディング表示
   container.innerHTML = `
@@ -42,31 +59,39 @@ export async function renderViewerApp(container) {
   `
 
   let allTournaments = []
-  let sourceLabel = ''
 
-  // 1. /tournament-data.json を fetch（キャッシュ回避）
-  try {
-    const res = await fetch(`/tournament-data.json?t=${Date.now()}`)
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data = await res.json()
-    // isPublic が明示的に true のものだけ表示
-    const fromJson = (data.tournaments || []).filter(t => t.isPublic === true)
-    if (fromJson.length > 0) {
-      allTournaments = fromJson
-      sourceLabel = 'json'
+  // 1. GitHub Gist からデータ取得（サーバーから Gist ID を取得してから fetch）
+  const gistId = await resolveGistId()
+  if (gistId) {
+    try {
+      const rawUrl = `https://gist.githubusercontent.com/${GIST_OWNER}/${gistId}/raw/tournament-data.json?t=${Date.now()}`
+      const res = await fetch(rawUrl)
+      if (res.ok) {
+        const data = await res.json()
+        const fromGist = (data.tournaments || []).filter(t => t.isPublic === true)
+        if (fromGist.length > 0) allTournaments = fromGist
+      }
+    } catch (e) {
+      console.warn('[ViewerApp] Gist fetch失敗:', e.message)
     }
-  } catch (e) {
-    // fetch 失敗時はコンソールに記録してフォールバックへ
-    console.warn('[ViewerApp] /tournament-data.json fetch失敗:', e.message)
   }
 
-  // 2. JSON が空 or fetch 失敗の場合 → localStorage フォールバック
+  // 2. Gist 未設定 or 空 → /tournament-data.json を試みる（ローカル開発用）
+  if (allTournaments.length === 0) {
+    try {
+      const res = await fetch(`/tournament-data.json?t=${Date.now()}`)
+      if (res.ok) {
+        const data = await res.json()
+        const fromJson = (data.tournaments || []).filter(t => t.isPublic === true)
+        if (fromJson.length > 0) allTournaments = fromJson
+      }
+    } catch { /* 無視 */ }
+  }
+
+  // 3. それも空 → localStorage フォールバック（同じブラウザのみ）
   if (allTournaments.length === 0) {
     const fromLocal = getLocalPublicTournaments()
-    if (fromLocal.length > 0) {
-      allTournaments = fromLocal
-      sourceLabel = 'local'
-    }
+    if (fromLocal.length > 0) allTournaments = fromLocal
   }
 
   if (allTournaments.length === 0) {
