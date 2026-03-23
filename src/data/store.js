@@ -4,6 +4,7 @@ const defaultTournament = {
   id: null,
   title: '',
   createdAt: null,
+  isPublic: false, // 閲覧ページへの公開フラグ（デフォルト非公開）
   settings: {
     tournamentSize: 8,
     defaultBattleTimes: ['19:00', '20:00', '21:00']

@@ -182,6 +182,25 @@ export function renderHomeScreen(container, onEnterTournament) {
         store.deleteArchivedTournament(id)
       })
     })
+
+    // 公開/非公開トグル（進行中の大会）
+    container.querySelector('#toggle-active-public')?.addEventListener('click', () => {
+      const ct = store.getState().currentTournament
+      if (!ct) return
+      store.updateTournament({ isPublic: !ct.isPublic })
+    })
+
+    // 公開/非公開トグル（過去大会）
+    container.querySelectorAll('[data-toggle-public]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.togglePublic
+        const { tournaments } = store.getState()
+        const t = tournaments.find(x => x.id === id)
+        if (!t) return
+        const updated = tournaments.map(x => x.id === id ? { ...x, isPublic: !x.isPublic } : x)
+        store.update({ tournaments: updated })
+      })
+    })
   }
 
   store.subscribe(render)
@@ -197,6 +216,7 @@ function renderActiveTournamentCard(t) {
     tournament: '決勝トーナメント進行中',
     finished: '終了'
   }[t.stage] || t.stage
+  const isPublic = !!t.isPublic
 
   return `
     <div class="home-tournament-card home-active-card">
@@ -211,6 +231,10 @@ function renderActiveTournamentCard(t) {
         </div>
       </div>
       <div class="home-tc-actions">
+        <button class="btn btn-sm ${isPublic ? 'btn-teal' : 'btn-secondary'}" id="toggle-active-public"
+                title="${isPublic ? '閲覧ページで公開中（クリックで非公開）' : '非公開（クリックで公開）'}">
+          ${isPublic ? '🌐 公開中' : '🔒 非公開'}
+        </button>
         <button class="btn btn-primary btn-sm" id="resume-active-btn">▶ 再開</button>
       </div>
     </div>
@@ -224,6 +248,7 @@ function renderTournamentCard(t) {
   const winnerName = hasWinner
     ? (t.participants || []).find(p => p.id === t.tournamentBracket.winner)?.name || '不明'
     : null
+  const isPublic = !!t.isPublic
 
   return `
     <div class="home-tournament-card">
@@ -238,6 +263,10 @@ function renderTournamentCard(t) {
         </div>
       </div>
       <div class="home-tc-actions">
+        <button class="btn btn-sm ${isPublic ? 'btn-teal' : 'btn-secondary'}" data-toggle-public="${t.id}"
+                title="${isPublic ? '閲覧ページで公開中（クリックで非公開）' : '非公開（クリックで公開）'}">
+          ${isPublic ? '🌐 公開中' : '🔒 非公開'}
+        </button>
         <button class="btn btn-secondary btn-sm" data-open-tournament="${t.id}">👁 閲覧</button>
         <button class="btn btn-danger btn-sm" data-delete-tournament="${t.id}">🗑</button>
       </div>

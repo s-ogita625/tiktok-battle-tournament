@@ -1316,10 +1316,6 @@
   align-items: start;
 }
 
-@media (max-width: 768px) {
-  .viewer-layout { grid-template-columns: 1fr; }
-}
-
 /* サイドバー */
 .viewer-sidebar {
   background: var(--color-surface);
@@ -1368,6 +1364,78 @@
   background: rgba(254, 44, 85, 0.1);
   color: var(--color-primary);
   font-weight: 700;
+}
+
+/* スマホ: サイドバーを横スクロールバーに変更 */
+@media (max-width: 768px) {
+  .viewer-app-wrap { padding: 12px 12px 60px; }
+
+  .viewer-layout {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .viewer-sidebar {
+    position: static;
+    padding: 10px 12px;
+    border-radius: var(--radius-lg);
+  }
+
+  .viewer-sidebar-title { margin-bottom: 8px; }
+
+  /* 大会一覧ボタンを横並びスクロールに */
+  .viewer-sidebar-list {
+    display: flex;
+    flex-direction: row;
+    gap: 6px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .viewer-sidebar-list::-webkit-scrollbar { display: none; }
+
+  .viewer-tournament-btn {
+    flex-shrink: 0;
+    width: auto;
+    white-space: nowrap;
+    padding: 6px 12px;
+    font-size: 0.8rem;
+  }
+
+  .viewer-detail {
+    padding: 16px 14px;
+    border-radius: var(--radius-lg);
+  }
+
+  .viewer-detail-title { font-size: 1.1rem; }
+
+  .viewer-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    flex-wrap: nowrap;
+  }
+  .viewer-tabs::-webkit-scrollbar { display: none; }
+
+  .viewer-tab {
+    flex-shrink: 0;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+  }
+
+  /* グループビューを1列に */
+  .viewer-groups-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* 対戦カードのプレイヤー名を省略 */
+  .viewer-battle-players span:not(.viewer-battle-score) {
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
 .viewer-active-dot {
@@ -1502,7 +1570,6 @@
 
 .viewer-participant-info { flex: 1; min-width: 0; }
 .viewer-participant-name { font-weight: 700; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.viewer-participant-sales { font-size: 0.82rem; color: var(--color-text-muted); }
 .viewer-tiktok-link { font-size: 0.75rem; color: var(--color-secondary); text-decoration: none; }
 .viewer-tiktok-link:hover { text-decoration: underline; }
 

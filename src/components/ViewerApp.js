@@ -11,18 +11,18 @@ export function renderViewerApp(container) {
   function render() {
     const { currentTournament, tournaments } = store.getState()
 
-    // 表示対象：進行中 + 過去の大会すべて
+    // 表示対象：isPublic=true の大会のみ（閲覧ページ）
     const allTournaments = [
       ...(currentTournament ? [currentTournament] : []),
       ...tournaments
-    ]
+    ].filter(t => t.isPublic)
 
     if (allTournaments.length === 0) {
       container.innerHTML = `
         <div class="viewer-empty">
           <div class="viewer-empty-icon">🏆</div>
-          <div class="viewer-empty-title">大会情報がありません</div>
-          <div class="viewer-empty-desc">管理者がデータを登録するとここに表示されます</div>
+          <div class="viewer-empty-title">公開中の大会情報がありません</div>
+          <div class="viewer-empty-desc">管理者が大会を公開するとここに表示されます</div>
         </div>
       `
       return
@@ -33,14 +33,16 @@ export function renderViewerApp(container) {
         <!-- サイドバー：大会一覧 -->
         <aside class="viewer-sidebar">
           <div class="viewer-sidebar-title">大会一覧</div>
-          ${allTournaments.map((t, i) => `
-            <button class="viewer-tournament-btn ${i === 0 ? 'active' : ''}"
-                    data-tournament-idx="${i}">
-              ${currentTournament && t.id === currentTournament.id
-                ? `<span class="viewer-active-dot"></span>` : ''}
-              ${escHtml(t.title || '無題の大会')}
-            </button>
-          `).join('')}
+          <div class="viewer-sidebar-list">
+            ${allTournaments.map((t, i) => `
+              <button class="viewer-tournament-btn ${i === 0 ? 'active' : ''}"
+                      data-tournament-idx="${i}">
+                ${currentTournament && t.id === currentTournament.id
+                  ? `<span class="viewer-active-dot"></span>` : ''}
+                ${escHtml(t.title || '無題の大会')}
+              </button>
+            `).join('')}
+          </div>
         </aside>
 
         <!-- メイン：選択された大会の詳細 -->
@@ -137,12 +139,12 @@ function renderParticipantsView(participants) {
     return `<div class="viewer-empty-section">参加者が登録されていません</div>`
   }
 
-  // 売上順（降順）でソート
-  const sorted = [...participants].sort((a, b) => Number(b.sales) - Number(a.sales))
+  // 名前順（あいうえお順）で表示（売上は非公開）
+  const sorted = [...participants].sort((a, b) => a.name.localeCompare(b.name, 'ja'))
 
   return `
     <div class="viewer-participants-grid">
-      ${sorted.map((p, i) => {
+      ${sorted.map((p) => {
         const imgSrc = convertImageUrl(p.profileImageUrl || '')
         const avatarHtml = imgSrc
           ? `<img class="viewer-avatar" src="${escHtml(imgSrc)}" alt="${escHtml(p.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="avatar-initials viewer-avatar-init" style="display:none">${p.name.slice(0,2)}</div>`
@@ -150,11 +152,9 @@ function renderParticipantsView(participants) {
 
         return `
           <div class="viewer-participant-card">
-            <div class="viewer-participant-rank">${i + 1}</div>
             <div class="viewer-participant-avatar-wrap">${avatarHtml}</div>
             <div class="viewer-participant-info">
               <div class="viewer-participant-name">${escHtml(p.name)}</div>
-              <div class="viewer-participant-sales">¥${Number(p.sales).toLocaleString()}</div>
               ${p.tiktokUrl
                 ? `<a href="${escHtml(p.tiktokUrl)}" target="_blank" rel="noopener" class="viewer-tiktok-link">@TikTok ↗</a>`
                 : ''}
