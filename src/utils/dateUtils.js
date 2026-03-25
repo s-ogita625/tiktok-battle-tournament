@@ -48,3 +48,35 @@ export function isFriday(dateStr) {
 export function compareDates(a, b) {
   return a < b ? -1 : a > b ? 1 : 0
 }
+
+// NG日エントリから日付部分のみ取得 "YYYY-MM-DD" または "YYYY-MM-DD|HH:MM-HH:MM"
+export function getDatePart(entry) {
+  return entry ? entry.split('|')[0] : ''
+}
+
+// NG日エントリから時間帯部分を取得（なければ null）"HH:MM-HH:MM" or null
+export function getTimePart(entry) {
+  if (!entry || !entry.includes('|')) return null
+  return entry.split('|')[1] || null
+}
+
+// 時間帯付きNG日エントリを生成
+export function makeUnavailEntry(date, timeRange = null) {
+  return timeRange ? `${date}|${timeRange}` : date
+}
+
+// バトル候補日・時刻が NG日エントリにブロックされるかチェック
+// entry: "YYYY-MM-DD" または "YYYY-MM-DD|HH:MM-HH:MM"
+// battleTime: "HH:MM" (undefined なら終日比較)
+export function isBlockedBy(entry, battleDate, battleTime) {
+  const datePart = getDatePart(entry)
+  if (datePart !== battleDate) return false
+  const timePart = getTimePart(entry)
+  // 時間帯指定なし → 終日NG
+  if (!timePart) return true
+  // battleTime が未指定なら時間帯NG日は「部分的なNG」とみなしブロックしない
+  if (!battleTime) return false
+  // バトル時刻が NG時間帯に含まれるか
+  const [ngStart, ngEnd] = timePart.split('-')
+  return battleTime >= ngStart && battleTime < ngEnd
+}

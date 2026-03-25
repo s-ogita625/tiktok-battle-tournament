@@ -362,6 +362,22 @@
   border-color: var(--color-danger);
 }
 
+/* 時間帯NGのみ（部分的なNG）*/
+.date-picker-day.unavailable-partial {
+  background: rgba(255, 150, 0, 0.18);
+  color: #ffa040;
+  border-color: #ffa040;
+  position: relative;
+}
+.date-picker-day.unavailable-partial::after {
+  content: '⏰';
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  font-size: 0.5rem;
+  line-height: 1;
+}
+
 .date-picker-day.empty,
 .date-picker-day.past {
   opacity: 0.3;
@@ -390,6 +406,7 @@
 
 .legend-dot.available { background: var(--color-success); }
 .legend-dot.unavailable { background: var(--color-danger); }
+.legend-dot.unavailable-partial { background: #ffa040; }
 
 /* === スコア入力 === */
 .score-input {

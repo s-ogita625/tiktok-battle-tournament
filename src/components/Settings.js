@@ -136,7 +136,7 @@ export function renderSettings(container) {
 
     // 時刻追加
     container.querySelector('#add-time-btn')?.addEventListener('click', () => {
-      const times = [...(store.getState().currentTournament?.settings.defaultBattleTimes || []), '20:00']
+      const times = [...(store.getState().currentTournament?.settings.defaultBattleTimes || []), '21:00']
       store.updateTournament(ct => ({ settings: { ...ct.settings, defaultBattleTimes: times } }))
     })
 

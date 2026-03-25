@@ -7,7 +7,7 @@ const defaultTournament = {
   isPublic: false, // 閲覧ページへの公開フラグ（デフォルト非公開）
   settings: {
     tournamentSize: 8,
-    defaultBattleTimes: ['19:00', '20:00', '21:00']
+    defaultBattleTimes: ['21:00', '21:30', '22:00', '22:30', '23:00', '23:30']
   },
   participants: [],
   groups: [],
