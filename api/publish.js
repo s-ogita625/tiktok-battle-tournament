@@ -57,7 +57,8 @@ export default async function handler(req, res) {
         tiktokUrl:       p.tiktokUrl  || '',
         // Base64データURLは容量が大きくGistの制限に引っかかるため除外
         // 通常のhttps://URLのみ公開データに含める
-        profileImageUrl: (p.profileImageUrl && !p.profileImageUrl.startsWith('data:')) ? p.profileImageUrl : '',
+        // Base64データURLもそのまま含める（Gist は最大 10MB まで対応）
+        profileImageUrl: p.profileImageUrl || '',
         groupId:         p.groupId    || null,
         availableDates:              p.availableDates             || [],
         unavailableDates:            p.unavailableDates           || [],

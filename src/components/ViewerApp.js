@@ -202,12 +202,14 @@ function renderTournamentDetail(container, t) {
   })
 
   // ──────────────────────────────────────────────────────
-  //  グループタブ：ライバーカード選択フィルター
+  //  グループタブ：ライバー絞り込みフィルター（ドロップダウン方式）
   // ──────────────────────────────────────────────────────
-  const filterChips  = container.querySelectorAll('.viewer-filter-chip')
-  const filterStatus = container.querySelector('#group-filter-status')
+  const filterToggleBtn  = container.querySelector('#group-filter-toggle-btn')
+  const filterDropdown   = container.querySelector('#group-filter-dropdown')
+  const filterClearBtn   = container.querySelector('#group-filter-clear-btn')
+  const filterStatus     = container.querySelector('#group-filter-status')
 
-  if (filterChips.length > 0 && filterStatus) {
+  if (filterToggleBtn && filterDropdown) {
     let activeFilter = ''
 
     /** フィルターを適用して対戦カードを絞り込む */
@@ -220,7 +222,9 @@ function renderTournamentDetail(container, t) {
         container.querySelectorAll('.viewer-group-card').forEach(gc => gc.style.display = '')
         filterStatus.style.display = 'none'
         filterStatus.textContent = ''
-        filterChips.forEach(c => c.classList.remove('active'))
+        filterClearBtn.style.display = 'none'
+        filterToggleBtn.classList.remove('is-active')
+        filterToggleBtn.textContent = '🔍 ライバーで絞り込み'
         return
       }
 
@@ -239,25 +243,44 @@ function renderTournamentDetail(container, t) {
 
       filterStatus.style.display = ''
       filterStatus.textContent = `「${name}」の対戦：${matchCount}件`
+      filterClearBtn.style.display = ''
+      filterToggleBtn.classList.add('is-active')
+      filterToggleBtn.textContent = `🔍 ${name}`
     }
 
-    // ライバーカードのクリック：選択 or 解除トグル
-    filterChips.forEach(chip => {
-      chip.addEventListener('click', e => {
-        // TikTokリンクのクリックはフィルター操作しない
-        if (e.target.closest('.viewer-chip-link') && e.target.closest('a')) return
+    // 絞り込みボタンクリック → ドロップダウン開閉
+    filterToggleBtn.addEventListener('click', () => {
+      const isOpen = filterDropdown.style.display !== 'none'
+      filterDropdown.style.display = isOpen ? 'none' : ''
+    })
 
-        const name = chip.dataset.name || ''
-        if (activeFilter === name) {
-          // 同じカードを再クリック → フィルター解除
-          filterChips.forEach(c => c.classList.remove('active'))
-          applyFilter('')
-        } else {
-          filterChips.forEach(c => c.classList.remove('active'))
-          chip.classList.add('active')
-          applyFilter(name)
-        }
+    // ドロップダウン内のライバー選択
+    filterDropdown.querySelectorAll('.viewer-filter-dropdown-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const name = item.dataset.name || ''
+        filterDropdown.style.display = 'none'
+        // ドロップダウン内のアクティブ状態を更新
+        filterDropdown.querySelectorAll('.viewer-filter-dropdown-item').forEach(i => i.classList.remove('active'))
+        item.classList.add('active')
+        applyFilter(name)
       })
+    })
+
+    // クリアボタン
+    filterClearBtn.addEventListener('click', () => {
+      filterDropdown.querySelectorAll('.viewer-filter-dropdown-item').forEach(i => i.classList.remove('active'))
+      applyFilter('')
+    })
+
+    // ドロップダウン外クリックで閉じる
+    document.addEventListener('click', e => {
+      if (
+        !filterToggleBtn.contains(e.target) &&
+        !filterDropdown.contains(e.target) &&
+        !filterClearBtn.contains(e.target)
+      ) {
+        filterDropdown.style.display = 'none'
+      }
     })
   }
 }
@@ -309,20 +332,25 @@ function renderGroupsView(groups, participants) {
 
   return `
     <div class="viewer-groups-filter-bar">
-      <div class="viewer-filter-label">🔍 ライバーを選んで絞り込み</div>
-      <div class="viewer-filter-chips" id="group-filter-chips">
+      <div class="viewer-filter-top-row">
+        <button class="viewer-filter-toggle-btn" id="group-filter-toggle-btn">
+          🔍 ライバーで絞り込み
+        </button>
+        <button class="viewer-filter-clear-btn" id="group-filter-clear-btn" style="display:none">
+          ✕ クリア
+        </button>
+      </div>
+      <!-- ドロップダウン：ライバーカード一覧 -->
+      <div class="viewer-filter-dropdown" id="group-filter-dropdown" style="display:none">
         ${participants.map(p => {
           const imgSrc = convertImageUrl(p.profileImageUrl || '')
           const avatarHtml = imgSrc
             ? `<img class="viewer-chip-avatar" src="${escHtml(imgSrc)}" alt="${escHtml(p.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="avatar-initials viewer-chip-avatar-init" style="display:none">${p.name.slice(0,2)}</div>`
             : `<div class="avatar-initials viewer-chip-avatar-init">${p.name.slice(0,2)}</div>`
-          const wrap = p.tiktokUrl
-            ? `<a href="${escHtml(p.tiktokUrl)}" target="_blank" rel="noopener" class="viewer-chip-link" title="TikTokを開く">${avatarHtml}</a>`
-            : `<div class="viewer-chip-link viewer-chip-link-nourl">${avatarHtml}</div>`
           return `
-            <button class="viewer-filter-chip" data-name="${escHtml(p.name)}" title="${escHtml(p.name)}">
-              ${wrap}
-              <span class="viewer-chip-name">${escHtml(p.name)}</span>
+            <button class="viewer-filter-dropdown-item" data-name="${escHtml(p.name)}">
+              <div class="viewer-dropdown-avatar">${avatarHtml}</div>
+              <span class="viewer-dropdown-name">${escHtml(p.name)}</span>
             </button>
           `
         }).join('')}
@@ -352,27 +380,33 @@ function renderGroupCard(group, participants) {
         </thead>
         <tbody>
           ${standings.length > 0
-            ? standings.map(s => {
-                const p = participants.find(x => x.id === s.participantId)
-                const isAdv = s.rank <= (group.advanceCount || 1)
-                return `
-                  <tr class="${isAdv ? 'viewer-row-advance' : ''}">
-                    <td>${s.rank}</td>
-                    <td>
-                      <div style="display:flex;align-items:center;gap:6px">
-                        ${p?.profileImageUrl
-                          ? `<img src="${escHtml(convertImageUrl(p.profileImageUrl))}" style="width:22px;height:22px;border-radius:50%;object-fit:cover" onerror="this.style.display='none'" alt="" />`
-                          : `<div class="avatar-initials" style="width:22px;height:22px;font-size:0.55rem">${(p?.name||'?').slice(0,2)}</div>`}
-                        <span>${escHtml(p?.name || '不明')}</span>
-                        ${isAdv ? `<span style="color:var(--color-secondary);font-size:0.7rem">↑進出</span>` : ''}
-                      </div>
-                    </td>
-                    <td style="color:var(--color-success);font-weight:700">${s.wins}</td>
-                    <td style="color:var(--color-danger)">${s.losses}</td>
-                    <td>${Number(s.totalScore).toLocaleString()}</td>
-                  </tr>
-                `
-              }).join('')
+            ? (() => {
+                // 1試合以上結果が出ているかチェック
+                const hasBattleResult = standings.some(s => (s.wins + s.losses) > 0)
+                return standings.map(s => {
+                  const p = participants.find(x => x.id === s.participantId)
+                  const isAdv = s.rank <= (group.advanceCount || 1)
+                  // 結果が出ている場合のみ↑進出バッジを表示
+                  const showAdv = isAdv && hasBattleResult
+                  return `
+                    <tr class="${showAdv ? 'viewer-row-advance' : ''}">
+                      <td>${s.rank}</td>
+                      <td>
+                        <div style="display:flex;align-items:center;gap:6px">
+                          ${p?.profileImageUrl
+                            ? `<img src="${escHtml(convertImageUrl(p.profileImageUrl))}" style="width:22px;height:22px;border-radius:50%;object-fit:cover" onerror="this.style.display='none'" alt="" />`
+                            : `<div class="avatar-initials" style="width:22px;height:22px;font-size:0.55rem">${(p?.name||'?').slice(0,2)}</div>`}
+                          <span>${escHtml(p?.name || '不明')}</span>
+                          ${showAdv ? `<span style="color:var(--color-secondary);font-size:0.7rem">↑進出</span>` : ''}
+                        </div>
+                      </td>
+                      <td style="color:var(--color-success);font-weight:700">${s.wins}</td>
+                      <td style="color:var(--color-danger)">${s.losses}</td>
+                      <td>${Number(s.totalScore).toLocaleString()}</td>
+                    </tr>
+                  `
+                }).join('')
+              })()
             : group.participantIds.map((id, i) => {
                 const p = participants.find(x => x.id === id)
                 return `<tr><td>${i+1}</td><td>${escHtml(p?.name || '不明')}</td><td>-</td><td>-</td><td>-</td></tr>`
