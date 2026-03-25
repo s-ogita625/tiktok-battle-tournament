@@ -200,6 +200,134 @@ function renderTournamentDetail(container, t) {
       if (target) target.style.display = ''
     })
   })
+
+  // ──────────────────────────────────────────────────────
+  //  グループタブ：ライバー名フィルター
+  // ──────────────────────────────────────────────────────
+  const filterInput     = container.querySelector('#group-filter-input')
+  const filterClear     = container.querySelector('#group-filter-clear')
+  const filterCandidates = container.querySelector('#group-filter-candidates')
+  const filterStatus    = container.querySelector('#group-filter-status')
+
+  if (filterInput) {
+    // すべての参加者名（重複なし）をフィルター候補として保持
+    const allParticipantNames = [...new Set(
+      [...container.querySelectorAll('.viewer-battle-card')].flatMap(card => [
+        card.dataset.p1, card.dataset.p2
+      ]).filter(Boolean)
+    )]
+
+    /** フィルターを適用して対戦カードを絞り込む */
+    function applyFilter(name) {
+      const query = name.trim()
+      const allCards = container.querySelectorAll('.viewer-battle-card')
+
+      if (!query) {
+        // フィルターなし：全カード表示
+        allCards.forEach(card => card.style.display = '')
+        filterStatus.style.display = 'none'
+        filterStatus.textContent = ''
+        filterClear.style.display = 'none'
+        // グループカード全体も表示
+        container.querySelectorAll('.viewer-group-card').forEach(gc => gc.style.display = '')
+        return
+      }
+
+      filterClear.style.display = ''
+
+      let matchCount = 0
+      allCards.forEach(card => {
+        const p1 = card.dataset.p1 || ''
+        const p2 = card.dataset.p2 || ''
+        const hit = p1 === query || p2 === query
+        card.style.display = hit ? '' : 'none'
+        if (hit) matchCount++
+      })
+
+      // 対戦カードが1件もないグループカードは非表示に
+      container.querySelectorAll('.viewer-group-card').forEach(gc => {
+        const visible = [...gc.querySelectorAll('.viewer-battle-card')].some(c => c.style.display !== 'none')
+        gc.style.display = visible ? '' : 'none'
+      })
+
+      filterStatus.style.display = ''
+      filterStatus.textContent = `「${query}」の対戦：${matchCount}件`
+    }
+
+    // テキスト入力イベント：候補リストを絞り込み表示
+    filterInput.addEventListener('input', () => {
+      const val = filterInput.value.trim()
+
+      if (val === '') {
+        filterCandidates.style.display = 'none'
+        applyFilter('')
+        return
+      }
+
+      // 前方一致で候補を絞り込む
+      const matched = allParticipantNames.filter(name =>
+        name.includes(val) || name.toLowerCase().includes(val.toLowerCase())
+      )
+
+      // 候補ボタンの表示を更新
+      filterCandidates.querySelectorAll('.viewer-filter-candidate').forEach(btn => {
+        const name = btn.dataset.name || ''
+        const hit = matched.includes(name)
+        btn.style.display = hit ? '' : 'none'
+      })
+
+      const hasVisible = matched.length > 0
+      filterCandidates.style.display = hasVisible ? '' : 'none'
+
+      // 完全一致する名前があればすぐにフィルター実行
+      if (matched.length === 1 && matched[0] === val) {
+        applyFilter(val)
+      } else if (allParticipantNames.includes(val)) {
+        applyFilter(val)
+      } else {
+        // まだ入力途中なのでカードは非表示にしない（全表示のまま）
+        applyFilter('')
+        filterClear.style.display = val ? '' : 'none'
+      }
+    })
+
+    // Enterキー：そのまま確定
+    filterInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        filterCandidates.style.display = 'none'
+        applyFilter(filterInput.value)
+      }
+      if (e.key === 'Escape') {
+        filterCandidates.style.display = 'none'
+        filterInput.value = ''
+        applyFilter('')
+      }
+    })
+
+    // 候補ボタンクリック：名前をセットして絞り込み実行
+    filterCandidates.querySelectorAll('.viewer-filter-candidate').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const name = btn.dataset.name || ''
+        filterInput.value = name
+        filterCandidates.style.display = 'none'
+        applyFilter(name)
+      })
+    })
+
+    // クリアボタン：リセット
+    filterClear.addEventListener('click', () => {
+      filterInput.value = ''
+      filterCandidates.style.display = 'none'
+      applyFilter('')
+    })
+
+    // 入力欄外クリックで候補を閉じる
+    document.addEventListener('click', e => {
+      if (!filterInput.contains(e.target) && !filterCandidates.contains(e.target)) {
+        filterCandidates.style.display = 'none'
+      }
+    }, { once: false })
+  }
 }
 
 // ──────────────────────────────────────────────────────
@@ -247,8 +375,31 @@ function renderGroupsView(groups, participants) {
     return `<div class="viewer-empty-section">グループ情報がありません</div>`
   }
 
+  // 参加者名リスト（フィルター候補）
+  const allNames = participants.map(p => escHtml(p.name))
+
   return `
-    <div class="viewer-groups-grid">
+    <div class="viewer-groups-filter-bar">
+      <div class="viewer-groups-filter-inner">
+        <input
+          type="text"
+          id="group-filter-input"
+          class="viewer-filter-input"
+          placeholder="🔍 ライバー名で絞り込み..."
+          autocomplete="off"
+        />
+        <button id="group-filter-clear" class="viewer-filter-clear-btn" style="display:none">✕ クリア</button>
+      </div>
+      <div id="group-filter-candidates" class="viewer-filter-candidates" style="display:none">
+        ${participants.map(p => `
+          <button class="viewer-filter-candidate" data-name="${escHtml(p.name)}">
+            ${escHtml(p.name)}
+          </button>
+        `).join('')}
+      </div>
+      <div id="group-filter-status" class="viewer-filter-status" style="display:none"></div>
+    </div>
+    <div class="viewer-groups-grid" id="viewer-groups-grid">
       ${groups.map(group => renderGroupCard(group, participants)).join('')}
     </div>
   `
@@ -302,14 +453,25 @@ function renderGroupCard(group, participants) {
 
       <!-- 対戦カード -->
       <div class="viewer-battles">
-        ${group.battles.map(battle => {
+        ${[...group.battles].sort((a, b) => {
+          const aHasDate = !!a.scheduledDate
+          const bHasDate = !!b.scheduledDate
+          if (!aHasDate && !bHasDate) return 0
+          if (!aHasDate) return 1
+          if (!bHasDate) return -1
+          if (a.scheduledDate !== b.scheduledDate) return a.scheduledDate < b.scheduledDate ? -1 : 1
+          const aTime = a.scheduledTime || '99:99'
+          const bTime = b.scheduledTime || '99:99'
+          return aTime < bTime ? -1 : aTime > bTime ? 1 : 0
+        }).map(battle => {
           const p1 = participants.find(p => p.id === battle.participant1Id)
           const p2 = participants.find(p => p.id === battle.participant2Id)
           if (!p1 || !p2) return ''
           const isDone = !!battle.result
           const w = battle.result?.winnerId
           return `
-            <div class="viewer-battle-card ${isDone ? 'is-done' : ''}">
+            <div class="viewer-battle-card ${isDone ? 'is-done' : ''}"
+                 data-p1="${escHtml(p1.name)}" data-p2="${escHtml(p2.name)}">
               <div class="viewer-battle-date">
                 ${battle.scheduledDate ? formatDate(battle.scheduledDate) : '日程未定'}
                 ${battle.scheduledTime ? battle.scheduledTime + '〜' : ''}
