@@ -3,11 +3,13 @@
  * 公開データを Vercel サーバーレス関数 (/api/publish) 経由で GitHub Gist に保存する。
  *
  * 仕組み:
- *   1. 管理画面が「公開中」の大会を POST /api/publish に送信
- *   2. サーバー側 (api/publish.js) が環境変数 GITHUB_TOKEN の gist スコープを使って
- *      GitHub Gist にデータを保存
- *   3. 返ってきた Gist ID を localStorage に保存
- *   4. 閲覧ページ (ViewerApp.js) が Gist の raw URL から直接データを取得
+ *   1. 管理画面が「公開中」の大会を publishTournamentData() で送信
+ *   2. Base64 画像（data:image/...）がある参加者は、先に /api/upload-image で
+ *      Gist に個別アップロードし、profileImageUrl を Gist RAW URL に変換する
+ *      ※ Vercel リクエストボディ上限 (4.5MB) 対策のため画像は個別に送信
+ *   3. URL 変換済みの大会データを /api/publish に POST
+ *   4. 返ってきた Gist ID を localStorage に保存
+ *   5. 閲覧ページ (ViewerApp.js) が Gist の raw URL から直接データを取得
  *      → Vercel の再デプロイは不要、即座に全デバイスに反映
  *
  * 必要な GitHub Token のスコープ: gist のみ（repo 不要）
@@ -27,34 +29,125 @@ export function saveGistId(id) {
 }
 
 /**
- * 公開対象の大会データを /api/publish に POST する
+ * Base64 画像を /api/upload-image 経由で Gist にアップロードし RAW URL を返す
+ * @param {string} participantId  参加者 ID
+ * @param {string} base64DataUrl  data:image/jpeg;base64,... 形式の文字列
+ * @param {string} gistId         既存の Gist ID（なければ空文字）
+ * @returns {Promise<{ok:boolean, rawUrl?:string, gistId?:string}>}
+ */
+async function uploadImageToGist(participantId, base64DataUrl, gistId) {
+  try {
+    const res = await fetch('/api/upload-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ participantId, base64: base64DataUrl, gistId })
+    })
+    const data = await res.json().catch(() => ({}))
+    return data
+  } catch (e) {
+    return { ok: false, message: e.message }
+  }
+}
+
+/**
+ * 公開対象の大会データを /api/publish に POST する内部関数
+ */
+async function postToPublishApi(tournaments) {
+  const res = await fetch('/api/publish', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tournaments })
+  })
+  const data = await res.json().catch(() => ({}))
+  return { res, data }
+}
+
+/**
+ * 公開対象の大会データを Gist に保存する
+ *
+ * Base64 画像がある参加者は先に /api/upload-image で個別アップロードし、
+ * profileImageUrl を Gist RAW URL に変換してから /api/publish に送信する。
+ *
  * @param {Array} tournaments  isPublic=true の大会配列（空配列も可）
+ * @param {Function} [onProgress]  進捗コールバック (message: string) => void
  * @returns {Promise<{ok:boolean, message:string}>}
  */
-export async function publishTournamentData(tournaments) {
+export async function publishTournamentData(tournaments, onProgress) {
   if (!tournaments) tournaments = []
 
   try {
-    const res = await fetch('/api/publish', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tournaments })
+    let currentGistId = getSavedGistId()
+
+    // -----------------------------------------------------------------
+    // ステップ1: Base64 画像がある参加者を先に Gist にアップロード
+    // -----------------------------------------------------------------
+    // Base64 画像を持つ参加者を収集
+    const uploadTasks = []
+    tournaments.forEach(t => {
+      ;(t.participants || []).forEach(p => {
+        if (p.profileImageUrl && p.profileImageUrl.startsWith('data:')) {
+          uploadTasks.push({ tournamentId: t.id, participantId: p.id, base64: p.profileImageUrl })
+        }
+      })
     })
 
-    const data = await res.json().catch(() => ({}))
+    // 画像アップロード（並列）
+    const uploadedUrls = {} // key: participantId → rawUrl
+    if (uploadTasks.length > 0) {
+      onProgress?.(`⏳ 画像をアップロード中... (${uploadTasks.length}件)`)
+
+      const results = await Promise.all(
+        uploadTasks.map(task => uploadImageToGist(task.participantId, task.base64, currentGistId))
+      )
+
+      results.forEach((result, i) => {
+        if (result.ok && result.rawUrl) {
+          uploadedUrls[uploadTasks[i].participantId] = result.rawUrl
+          // アップロード中に Gist が新規作成された場合、そのIDを使用
+          if (!currentGistId && result.gistId) {
+            currentGistId = result.gistId
+            saveGistId(currentGistId)
+          }
+        }
+      })
+    }
+
+    // -----------------------------------------------------------------
+    // ステップ2: Base64 を Gist RAW URL に差し替えて大会データを構築
+    // -----------------------------------------------------------------
+    const convertedTournaments = tournaments.map(t => ({
+      ...t,
+      participants: (t.participants || []).map(p => {
+        if (uploadedUrls[p.id]) {
+          // アップロード成功 → Gist RAW URL に置き換え
+          return { ...p, profileImageUrl: uploadedUrls[p.id] }
+        }
+        return p
+      })
+    }))
+
+    // -----------------------------------------------------------------
+    // ステップ3: 大会データを /api/publish に送信
+    // -----------------------------------------------------------------
+    onProgress?.('⏳ 大会データを公開中...')
+
+    const { res, data } = await postToPublishApi(convertedTournaments)
 
     if (res.ok && data.ok) {
-      // Gist ID を保存（次回から閲覧ページで自動参照）
-      if (data.gistId) {
-        saveGistId(data.gistId)
+      if (data.gistId) saveGistId(data.gistId)
+      const imgCount = uploadTasks.length
+      const imgNote = imgCount > 0 ? `\n画像 ${imgCount}件もアップロードしました。` : ''
+      return {
+        ok: true,
+        message: (data.message || `✅ ${tournaments.length}件の大会を公開しました！`) + imgNote
       }
-      return { ok: true, message: data.message || `✅ ${tournaments.length}件の大会を公開しました！` }
     }
 
     return {
       ok: false,
       message: data.message || `サーバーエラー (${res.status})`
     }
+
   } catch (e) {
     return { ok: false, message: `通信エラー: ${e.message}` }
   }

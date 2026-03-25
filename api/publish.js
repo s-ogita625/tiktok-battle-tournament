@@ -55,8 +55,8 @@ export default async function handler(req, res) {
         id:              p.id,
         name:            p.name,
         tiktokUrl:       p.tiktokUrl  || '',
-        // Base64データURL（data:image/...）は Vercel リクエストボディ上限（4.5MB）を超えるため除外
-        // https:// URL のみ公開データに含める（管理画面ではBase64のまま表示可能）
+        // publishUtils.js 側で Base64 → Gist RAW URL へ変換済み
+        // data: が残っている場合は念のため除外（サイズ制限対策）
         profileImageUrl: (p.profileImageUrl && !p.profileImageUrl.startsWith('data:'))
           ? p.profileImageUrl
           : '',

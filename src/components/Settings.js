@@ -154,13 +154,18 @@ export function renderSettings(container) {
       const resultEl = container.querySelector('#publish-result')
       btn.disabled = true
       btn.textContent = '⏳ 更新中...'
-      resultEl.style.display = 'none'
+      resultEl.style.display = ''
+      resultEl.style.background = 'rgba(255,255,255,0.05)'
+      resultEl.style.border = '1px solid var(--color-border)'
+      resultEl.style.color = 'var(--color-text-muted)'
+      resultEl.textContent = '⏳ 準備中...'
 
-      const result = await publishTournamentData(publicOnes)
+      const result = await publishTournamentData(publicOnes, (msg) => {
+        resultEl.textContent = msg
+      })
 
       btn.disabled = false
-      btn.textContent = '🚀 公開データを更新（Vercelへ反映）'
-      resultEl.style.display = ''
+      btn.textContent = '🚀 閲覧ページに反映する'
       resultEl.style.background = result.ok ? 'rgba(76,175,80,0.1)' : 'rgba(244,67,54,0.1)'
       resultEl.style.border = result.ok ? '1px solid rgba(76,175,80,0.3)' : '1px solid rgba(244,67,54,0.3)'
       resultEl.style.color = result.ok ? 'var(--color-success)' : 'var(--color-danger)'

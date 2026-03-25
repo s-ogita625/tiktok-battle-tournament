@@ -430,8 +430,8 @@ export function renderParticipantForm(container, editingId = null) {
             <input type="file" id="f-img-file" accept="image/*" style="display:none" />
             <input class="form-input" id="f-img" type="text" placeholder="https://... (画像の直リンクURL)" value="${escHtml(formData.profileImageUrl && !formData.profileImageUrl.startsWith('data:') ? formData.profileImageUrl : '')}" />
             <span class="form-hint">
-              📱 <strong>閲覧ページに画像を表示する場合はURLを入力してください</strong>（GoogleドライブURL可）<br>
-              📁 ファイルアップロードは管理画面のみ表示されます（閲覧ページには反映されません）
+              📁 ファイルアップロードまたは URL 入力に対応。<br>
+              設定画面の「🚀 閲覧ページに反映する」を実行すると閲覧ページにも表示されます。
             </span>
             <div id="img-preview-wrap" style="margin-top:8px;display:flex;align-items:center;gap:10px">
               ${formData.profileImageUrl ? `<img id="img-preview" src="${escHtml(formData.profileImageUrl.startsWith('data:') ? formData.profileImageUrl : convertImageUrl(formData.profileImageUrl))}" style="width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid var(--color-border)" onerror="this.style.display='none'" alt="プレビュー" />` : ''}
