@@ -127,6 +127,12 @@
   color: #ffa040;
 }
 
+.date-chip.available-partial {
+  background: rgba(56, 201, 122, 0.12);
+  color: #38c97a;
+  border: 1px solid rgba(56, 201, 122, 0.4);
+}
+
 /* === グループステージページ === */
 .group-stage-controls {
   display: flex;

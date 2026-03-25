@@ -370,12 +370,36 @@
   position: relative;
 }
 .date-picker-day.unavailable-partial::after {
-  content: '⏰';
+  content: '∂';
   position: absolute;
   top: -3px;
   right: -3px;
-  font-size: 0.5rem;
+  font-size: 0.55rem;
   line-height: 1;
+}
+
+/* 時間帯可能（部分的な可能） */
+.date-picker-day.available-partial {
+  background: rgba(56, 201, 122, 0.15);
+  color: #38c97a;
+  border-color: #38c97a;
+  position: relative;
+}
+.date-picker-day.available-partial::after {
+  content: '◐';
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  font-size: 0.55rem;
+  line-height: 1;
+}
+
+/* 可能・NGが混在 */
+.date-picker-day.day-mixed {
+  background: linear-gradient(135deg, rgba(56,201,122,0.25) 50%, rgba(239,68,68,0.25) 50%);
+  color: var(--color-text);
+  border-color: var(--color-border);
+  position: relative;
 }
 
 .date-picker-day.empty,
@@ -386,9 +410,10 @@
 
 .date-picker-legend {
   display: flex;
-  gap: 12px;
+  gap: 8px;
+  flex-wrap: wrap;
   margin-top: 8px;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: var(--color-text-muted);
 }
 
@@ -402,11 +427,16 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
+  flex-shrink: 0;
 }
 
-.legend-dot.available { background: var(--color-success); }
-.legend-dot.unavailable { background: var(--color-danger); }
+.legend-dot.available         { background: var(--color-success); }
+.legend-dot.available-partial { background: rgba(56,201,122,0.5); border: 1.5px solid #38c97a; }
+.legend-dot.unavailable       { background: var(--color-danger); }
 .legend-dot.unavailable-partial { background: #ffa040; }
+.legend-dot.day-mixed {
+  background: linear-gradient(135deg, #38c97a 50%, #ef4444 50%);
+}
 
 /* === スコア入力 === */
 .score-input {

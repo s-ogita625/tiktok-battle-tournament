@@ -1,6 +1,6 @@
 import { store } from '../data/store.js'
 import { generateId } from '../utils/exportUtils.js'
-import { today, formatDate, getDatePart, getTimePart, makeUnavailEntry } from '../utils/dateUtils.js'
+import { today, formatDate, getDatePart, getTimePart, makeUnavailEntry, makeAvailEntry, getTimeRanges } from '../utils/dateUtils.js'
 import { convertImageUrl } from './ParticipantList.js'
 
 export function renderParticipantForm(container, editingId = null) {
@@ -35,7 +35,40 @@ export function renderParticipantForm(container, editingId = null) {
     tournamentUnavailableDates: []
   }
 
-  // ----- カレンダー生成ヘルパー -----
+  // バトル時刻スロット（設定から取得）
+  function getBattleTimes() {
+    return store.getState().currentTournament?.settings?.defaultBattleTimes || ['21:00','21:30','22:00','22:30','23:00','23:30']
+  }
+
+  // ----- カレンダー表示ステータス判定 -----
+  // 'none' / 'available-full' / 'available-partial' / 'unavailable-full' / 'mixed'
+  function getDayStatus(dateStr, availField, unavailField) {
+    const availEntries = formData[availField].filter(e => getDatePart(e) === dateStr)
+    const unavailEntries = formData[unavailField].filter(e => getDatePart(e) === dateStr)
+
+    const hasAvail = availEntries.length > 0
+    const hasUnavail = unavailEntries.length > 0
+
+    if (!hasAvail && !hasUnavail) return 'none'
+
+    // 終日NGがあれば他に関係なく終日NG
+    const hasFullUnavail = unavailEntries.some(e => !getTimePart(e))
+    if (hasFullUnavail) return 'unavailable-full'
+
+    // 終日可能（時間帯指定なし）
+    const hasFullAvail = availEntries.some(e => !getTimePart(e))
+
+    if (hasAvail && !hasUnavail) {
+      return hasFullAvail ? 'available-full' : 'available-partial'
+    }
+    if (!hasAvail && hasUnavail) {
+      return 'unavailable-partial'
+    }
+    // 両方ある（混在）
+    return 'mixed'
+  }
+
+  // ----- カレンダー生成 -----
   function renderCalendar(month, availField, unavailField, prefix) {
     const year  = month.getFullYear()
     const mth   = month.getMonth()
@@ -56,182 +89,288 @@ export function renderParticipantForm(container, editingId = null) {
     for (let i = 0; i < firstDay; i++) html += `<div class="date-picker-day empty"></div>`
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${year}-${String(mth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
-      const isPast   = dateStr < todayStr
-      const isAvail  = formData[availField].includes(dateStr)
-      // unavailField は終日NG or 時間帯NG の両方を含む
-      const unavailEntry = formData[unavailField].find(e => getDatePart(e) === dateStr)
-      const isUnavail    = !!unavailEntry
-      const isTimeUnavail = isUnavail && !!getTimePart(unavailEntry) // 時間帯指定あり
+      const isPast  = dateStr < todayStr
+      const status  = getDayStatus(dateStr, availField, unavailField)
+
       let cls = 'date-picker-day'
-      if (isPast)         cls += ' past'
-      if (isAvail)        cls += ' available'
-      if (isUnavail && !isTimeUnavail) cls += ' unavailable'
-      if (isTimeUnavail)  cls += ' unavailable-partial'
-      html += `<div class="${cls}" data-date="${dateStr}" data-avail="${availField}" data-unavail="${unavailField}">${d}</div>`
+      if (isPast)                       cls += ' past'
+      if (status === 'available-full')  cls += ' available'
+      if (status === 'available-partial') cls += ' available-partial'
+      if (status === 'unavailable-full')  cls += ' unavailable'
+      if (status === 'unavailable-partial') cls += ' unavailable-partial'
+      if (status === 'mixed')             cls += ' day-mixed'
+
+      html += `<div class="${cls}" data-date="${dateStr}">${d}</div>`
     }
     html += `</div>
       <div class="date-picker-legend">
-        <div class="legend-item"><div class="legend-dot available"></div>バトル可能</div>
+        <div class="legend-item"><div class="legend-dot available"></div>終日可</div>
+        <div class="legend-item"><div class="legend-dot available-partial"></div>時間帯可</div>
         <div class="legend-item"><div class="legend-dot unavailable"></div>終日NG</div>
         <div class="legend-item"><div class="legend-dot unavailable-partial"></div>時間帯NG</div>
+        <div class="legend-item"><div class="legend-dot day-mixed"></div>混在</div>
       </div>`
     return html
   }
 
+  // ----- プレビュー表示 -----
   function renderPreview(availField, unavailField, previewId) {
     const el = container.querySelector(`#${previewId}`)
     if (!el) return
-    const all = [
-      ...formData[availField].map(d => ({ d, type: 'available', label: formatDate(d) })),
-      ...formData[unavailField].map(entry => {
-        const datePart = getDatePart(entry)
-        const timePart = getTimePart(entry)
-        const label = timePart ? `${formatDate(datePart)} ${timePart}NG` : formatDate(datePart)
-        return { d: entry, type: timePart ? 'unavailable-partial' : 'unavailable', label }
-      })
-    ].sort((a, b) => getDatePart(a.d).localeCompare(getDatePart(b.d)))
-    el.innerHTML = all.map(({ d, type, label }) =>
-      `<span class="date-chip ${type}" style="${type === 'unavailable-partial' ? 'background:rgba(255,150,0,0.18);color:#ffa040;border-color:#ffa040' : ''}">${label}</span>`
-    ).join('')
-  }
 
-  // 右クリック時のNG種別選択ポップアップ
-  function showUnavailPopup(e, date, unavailField, availField, calId, monthRef, previewId) {
-    e.preventDefault()
-    // 既存ポップアップ削除
-    document.querySelectorAll('.unavail-popup').forEach(p => p.remove())
+    // 日付ごとに集約
+    const allDates = new Set([
+      ...formData[availField].map(e => getDatePart(e)),
+      ...formData[unavailField].map(e => getDatePart(e))
+    ])
 
-    const popup = document.createElement('div')
-    popup.className = 'unavail-popup'
-    popup.style.cssText = `
-      position:fixed;z-index:2000;
-      background:var(--color-surface2);border:1px solid var(--color-border);
-      border-radius:8px;padding:6px;
-      box-shadow:0 4px 16px rgba(0,0,0,0.4);
-      display:flex;flex-direction:column;gap:4px;min-width:160px;
-    `
-    popup.style.left = `${Math.min(e.clientX, window.innerWidth - 180)}px`
-    popup.style.top  = `${Math.min(e.clientY, window.innerHeight - 120)}px`
+    const chips = []
+    for (const dateStr of [...allDates].sort()) {
+      const availEntries  = formData[availField].filter(e => getDatePart(e) === dateStr)
+      const unavailEntries = formData[unavailField].filter(e => getDatePart(e) === dateStr)
 
-    popup.innerHTML = `
-      <div style="font-size:0.72rem;color:var(--color-text-muted);padding:2px 6px 4px">NGを設定</div>
-      <button class="btn btn-sm" id="pop-allday" style="text-align:left;padding:5px 10px">🚫 終日NG</button>
-      <button class="btn btn-sm" id="pop-time" style="text-align:left;padding:5px 10px">⏰ 時間帯NG...</button>
-      <button class="btn btn-sm btn-danger" id="pop-clear" style="text-align:left;padding:5px 10px">🗑️ クリア</button>
-    `
-    document.body.appendChild(popup)
+      const hasFullUnavail = unavailEntries.some(e => !getTimePart(e))
+      if (hasFullUnavail) {
+        chips.push(`<span class="date-chip unavailable">${formatDate(dateStr)} 終日NG</span>`)
+        continue
+      }
 
-    const closePopup = () => popup.remove()
-    setTimeout(() => document.addEventListener('click', closePopup, { once: true }), 0)
+      const hasFullAvail = availEntries.some(e => !getTimePart(e))
+      if (hasFullAvail && unavailEntries.length === 0) {
+        chips.push(`<span class="date-chip available">${formatDate(dateStr)}</span>`)
+        continue
+      }
 
-    popup.querySelector('#pop-allday').addEventListener('click', (ev) => {
-      ev.stopPropagation()
-      // 同じ日の既存NG削除（時間帯含む）→ 終日NGを追加
-      formData[unavailField] = formData[unavailField].filter(en => getDatePart(en) !== date)
-      formData[availField]   = formData[availField].filter(d => d !== date)
-      formData[unavailField].push(date)
-      refreshCalendar()
-      closePopup()
-    })
-
-    popup.querySelector('#pop-time').addEventListener('click', (ev) => {
-      ev.stopPropagation()
-      closePopup()
-      showTimeRangeModal(date, unavailField, availField, refreshCalendar)
-    })
-
-    popup.querySelector('#pop-clear').addEventListener('click', (ev) => {
-      ev.stopPropagation()
-      formData[unavailField] = formData[unavailField].filter(en => getDatePart(en) !== date)
-      formData[availField]   = formData[availField].filter(d => d !== date)
-      refreshCalendar()
-      closePopup()
-    })
-
-    function refreshCalendar() {
-      const calEl = container.querySelector(`#${calId}`)
-      if (!calEl) return
-      calEl.innerHTML = renderCalendar(monthRef, availField, unavailField, prefix)
-      attachCalendarEvents(calId, availField, unavailField, prefix, monthRef, previewId)
-      renderPreview(availField, unavailField, previewId)
+      // 時間帯チップをまとめて表示
+      for (const e of availEntries) {
+        const tp = getTimePart(e)
+        if (tp) {
+          tp.split(',').forEach(r => {
+            chips.push(`<span class="date-chip available-partial">${formatDate(dateStr)} ${r}可</span>`)
+          })
+        } else {
+          chips.push(`<span class="date-chip available">${formatDate(dateStr)} 終日可</span>`)
+        }
+      }
+      for (const e of unavailEntries) {
+        const tp = getTimePart(e)
+        if (tp) {
+          tp.split(',').forEach(r => {
+            chips.push(`<span class="date-chip unavailable-partial">${formatDate(dateStr)} ${r}NG</span>`)
+          })
+        }
+      }
     }
+    el.innerHTML = chips.join('')
   }
 
-  // 時間帯NGモーダル
-  function showTimeRangeModal(date, unavailField, availField, onSave) {
-    const existing = document.getElementById('time-range-modal')
+  // ----- 日付クリック → 時間帯設定モーダル -----
+  function openDayModal(date, availField, unavailField, onSave) {
+    const existing = document.getElementById('day-schedule-modal')
     if (existing) existing.remove()
 
-    // バトル時刻リストをsettingsから取得してセレクト候補にする
-    const battleTimes = store.getState().currentTournament?.settings?.defaultBattleTimes || ['21:00','21:30','22:00','22:30','23:00','23:30']
-    // 候補: battleTimes ＋ 汎用0〜24時（30分刻み）からユニーク
+    const battleTimes = getBattleTimes()
+    // 全スロット（設定のバトル時刻 + 汎用0〜24時30分刻み）
     const allSlots = [...new Set([
       ...battleTimes,
-      ...Array.from({length:48}, (_, i) => {
-        const h = String(Math.floor(i/2)).padStart(2,'0')
+      ...Array.from({length: 49}, (_, i) => {
+        const h = String(Math.floor(i / 2)).padStart(2, '0')
         const m = i % 2 === 0 ? '00' : '30'
         return `${h}:${m}`
       })
-    ])].sort()
+    ])].sort().filter(t => t <= '24:00')
 
-    const makeOptions = (selected) => allSlots.map(t =>
-      `<option value="${t}" ${t === selected ? 'selected' : ''}>${t}</option>`
-    ).join('')
+    // 現在のこの日の設定を読み込む
+    const currentAvailEntries  = formData[availField].filter(e => getDatePart(e) === date)
+    const currentUnavailEntries = formData[unavailField].filter(e => getDatePart(e) === date)
+
+    const hasFullAvail   = currentAvailEntries.some(e => !getTimePart(e))
+    const hasFullUnavail = currentUnavailEntries.some(e => !getTimePart(e))
+
+    // 各スロットのステータスを計算
+    // 'available' | 'unavailable' | 'none'
+    function slotStatus(t) {
+      if (hasFullUnavail) return 'unavailable'
+      if (hasFullAvail)   return 'available'
+      const inAvail = currentAvailEntries.some(e => {
+        const tp = getTimePart(e)
+        if (!tp) return true
+        return tp.split(',').some(r => { const [s, en] = r.split('-'); return t >= s && t < en })
+      })
+      const inUnavail = currentUnavailEntries.some(e => {
+        const tp = getTimePart(e)
+        if (!tp) return true
+        return tp.split(',').some(r => { const [s, en] = r.split('-'); return t >= s && t < en })
+      })
+      if (inAvail)   return 'available'
+      if (inUnavail) return 'unavailable'
+      return 'none'
+    }
+
+    // スロット行を生成（隣接スロットを「時間帯」として表示：例 21:00〜21:30 の帯）
+    // allSlots[i] 〜 allSlots[i+1] の帯として扱う
+    const ranges = []
+    for (let i = 0; i < allSlots.length - 1; i++) {
+      ranges.push({ start: allSlots[i], end: allSlots[i + 1] })
+    }
+
+    // 初期状態：各帯のステータス
+    // 'available' | 'unavailable' | 'none'
+    const rangeState = ranges.map(r => slotStatus(r.start))
 
     const modal = document.createElement('div')
-    modal.id = 'time-range-modal'
-    modal.style.cssText = 'display:flex;position:fixed;inset:0;z-index:2100;background:rgba(0,0,0,0.6);align-items:center;justify-content:center'
+    modal.id = 'day-schedule-modal'
+    modal.style.cssText = 'display:flex;position:fixed;inset:0;z-index:2100;background:rgba(0,0,0,0.65);align-items:center;justify-content:center;padding:16px'
+
+    const renderSlots = () => ranges.map((r, i) => {
+      const st = rangeState[i]
+      const isBattle = battleTimes.includes(r.start)
+      const bg = st === 'available'   ? 'background:rgba(56,201,122,0.25);border-color:#38c97a;color:#38c97a'
+               : st === 'unavailable' ? 'background:rgba(239,68,68,0.25);border-color:#ef4444;color:#ef4444'
+               : 'background:transparent;border-color:var(--color-border);color:var(--color-text-dim)'
+      const icon = st === 'available'   ? '✅'
+                 : st === 'unavailable' ? '🚫'
+                 : '　'
+      return `<button type="button" class="slot-btn" data-idx="${i}" style="
+        display:flex;align-items:center;justify-content:space-between;
+        padding:7px 12px;border-radius:6px;border:1px solid;cursor:pointer;
+        font-size:0.82rem;text-align:left;width:100%;
+        transition:all 0.12s;${bg}
+      ">
+        <span>${r.start}〜${r.end}</span>
+        <span style="display:flex;gap:6px;align-items:center">
+          ${isBattle ? '<span style="font-size:0.65rem;background:rgba(255,200,0,0.2);color:#ffd700;padding:1px 5px;border-radius:4px;border:1px solid rgba(255,200,0,0.4)">バトル時刻</span>' : ''}
+          <span>${icon}</span>
+        </span>
+      </button>`
+    }).join('')
+
     modal.innerHTML = `
-      <div class="modal" style="min-width:300px;max-width:360px;width:90%">
-        <div class="modal-header">
-          <h2 class="modal-title">⏰ 時間帯NGを設定</h2>
-          <button class="modal-close" id="tr-close">✕</button>
+      <div class="modal" style="min-width:340px;max-width:420px;width:94%;max-height:92vh;display:flex;flex-direction:column">
+        <div class="modal-header" style="flex-shrink:0">
+          <h2 class="modal-title">📅 ${formatDate(date)} の設定</h2>
+          <button class="modal-close" id="dsm-close">✕</button>
         </div>
-        <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
-          <div style="font-size:0.82rem;color:var(--color-text-muted)">${formatDate(date)}</div>
-          <div style="display:flex;align-items:center;gap:10px">
-            <div style="flex:1">
-              <label class="form-label">開始</label>
-              <select class="form-input" id="tr-start">${makeOptions('21:00')}</select>
-            </div>
-            <div style="padding-top:22px;color:var(--color-text-dim)">〜</div>
-            <div style="flex:1">
-              <label class="form-label">終了</label>
-              <select class="form-input" id="tr-end">${makeOptions('23:30')}</select>
-            </div>
+        <div style="padding:12px 16px 8px;flex-shrink:0;border-bottom:1px solid var(--color-border)">
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button type="button" id="dsm-all-avail" class="btn btn-sm" style="background:rgba(56,201,122,0.2);border:1px solid #38c97a;color:#38c97a">✅ 終日可能</button>
+            <button type="button" id="dsm-all-unavail" class="btn btn-sm" style="background:rgba(239,68,68,0.2);border:1px solid #ef4444;color:#ef4444">🚫 終日NG</button>
+            <button type="button" id="dsm-clear" class="btn btn-sm btn-secondary">🗑️ クリア</button>
           </div>
-          <div style="font-size:0.75rem;color:var(--color-text-muted)">指定した時間帯はバトル時刻の自動割り当てで除外されます</div>
-          <div style="display:flex;gap:8px;justify-content:flex-end">
-            <button class="btn btn-secondary" id="tr-cancel">キャンセル</button>
-            <button class="btn btn-primary" id="tr-save">✅ 追加</button>
+          <div style="margin-top:8px;font-size:0.72rem;color:var(--color-text-muted)">
+            各帯をクリックして切り替え: なし → 可能 → NG → なし
           </div>
+        </div>
+        <div id="dsm-slots" style="overflow-y:auto;padding:10px 16px;display:flex;flex-direction:column;gap:4px;flex:1">
+          ${renderSlots()}
+        </div>
+        <div style="padding:12px 16px;display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;border-top:1px solid var(--color-border)">
+          <button type="button" class="btn btn-secondary" id="dsm-cancel">キャンセル</button>
+          <button type="button" class="btn btn-primary" id="dsm-save">✅ 保存</button>
         </div>
       </div>
     `
     document.body.appendChild(modal)
 
     const close = () => modal.remove()
-    modal.querySelector('#tr-close').addEventListener('click', close)
-    modal.querySelector('#tr-cancel').addEventListener('click', close)
-    modal.addEventListener('click', (e) => { if (e.target === modal) close() })
+    modal.querySelector('#dsm-close').addEventListener('click', close)
+    modal.querySelector('#dsm-cancel').addEventListener('click', close)
+    modal.addEventListener('click', e => { if (e.target === modal) close() })
 
-    modal.querySelector('#tr-save').addEventListener('click', () => {
-      const startVal = modal.querySelector('#tr-start').value
-      const endVal   = modal.querySelector('#tr-end').value
-      if (startVal >= endVal) {
-        showToast('終了時刻は開始時刻より後にしてください', 'error')
-        return
+    // 一括ボタン
+    modal.querySelector('#dsm-all-avail').addEventListener('click', () => {
+      rangeState.fill('available')
+      modal.querySelector('#dsm-slots').innerHTML = renderSlots()
+      reattachSlotEvents()
+    })
+    modal.querySelector('#dsm-all-unavail').addEventListener('click', () => {
+      rangeState.fill('unavailable')
+      modal.querySelector('#dsm-slots').innerHTML = renderSlots()
+      reattachSlotEvents()
+    })
+    modal.querySelector('#dsm-clear').addEventListener('click', () => {
+      rangeState.fill('none')
+      modal.querySelector('#dsm-slots').innerHTML = renderSlots()
+      reattachSlotEvents()
+    })
+
+    function reattachSlotEvents() {
+      modal.querySelectorAll('.slot-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = Number(btn.dataset.idx)
+          // none → available → unavailable → none
+          const cycle = { 'none': 'available', 'available': 'unavailable', 'unavailable': 'none' }
+          rangeState[idx] = cycle[rangeState[idx]]
+          modal.querySelector('#dsm-slots').innerHTML = renderSlots()
+          reattachSlotEvents()
+        })
+      })
+    }
+    reattachSlotEvents()
+
+    // 保存
+    modal.querySelector('#dsm-save').addEventListener('click', () => {
+      // この日の既存エントリをすべて削除
+      formData[availField]   = formData[availField].filter(e => getDatePart(e) !== date)
+      formData[unavailField] = formData[unavailField].filter(e => getDatePart(e) !== date)
+
+      // rangeState から連続した同ステータスの帯をまとめて時間帯に変換
+      const availRanges   = []
+      const unavailRanges = []
+
+      let i = 0
+      while (i < ranges.length) {
+        const st = rangeState[i]
+        if (st === 'none') { i++; continue }
+        // 同じステータスが続く限り結合
+        let j = i
+        while (j < ranges.length && rangeState[j] === st) j++
+        const rangeStr = `${ranges[i].start}-${ranges[j - 1].end}`
+        if (st === 'available')   availRanges.push(rangeStr)
+        if (st === 'unavailable') unavailRanges.push(rangeStr)
+        i = j
       }
-      // 同じ日の既存NG削除
-      formData[unavailField] = formData[unavailField].filter(en => getDatePart(en) !== date)
-      formData[availField]   = formData[availField].filter(d => d !== date)
-      formData[unavailField].push(makeUnavailEntry(date, `${startVal}-${endVal}`))
+
+      // availRanges が全スロットをカバーしていれば終日可能として記録
+      const allAvail = availRanges.length > 0 && unavailRanges.length === 0
+      const isFullDay = allAvail && availRanges.length === 1 &&
+        availRanges[0] === `${ranges[0].start}-${ranges[ranges.length - 1].end}`
+
+      if (availRanges.length > 0) {
+        if (isFullDay) {
+          formData[availField].push(date) // 終日可能
+        } else {
+          formData[availField].push(makeAvailEntry(date, availRanges.join(',')))
+        }
+      }
+      if (unavailRanges.length > 0) {
+        if (unavailRanges.length === 1 && availRanges.length === 0) {
+          // NG しかない場合：1帯なら時間帯NG、全帯なら終日NG
+          const allUnavail = unavailRanges.length === 1 &&
+            unavailRanges[0] === `${ranges[0].start}-${ranges[ranges.length - 1].end}`
+          if (allUnavail) {
+            formData[unavailField].push(date) // 終日NG
+          } else {
+            formData[unavailField].push(makeUnavailEntry(date, unavailRanges[0]))
+          }
+        } else {
+          // 複数NG帯
+          formData[unavailField].push(makeUnavailEntry(date, unavailRanges.join(',')))
+        }
+      }
+
       onSave()
       close()
-      showToast(`${formatDate(date)} ${startVal}〜${endVal} をNGに設定しました`, 'success')
+
+      // トースト
+      const availStr   = availRanges.length   > 0 ? `可: ${availRanges.join(', ')}` : ''
+      const unavailStr = unavailRanges.length  > 0 ? `NG: ${unavailRanges.join(', ')}` : ''
+      const msg = [availStr, unavailStr].filter(Boolean).join(' / ')
+      showToast(msg ? `${formatDate(date)} ${msg}` : `${formatDate(date)} の設定をクリアしました`, 'success')
     })
   }
 
+  // ----- カレンダーイベント -----
   function attachCalendarEvents(calId, availField, unavailField, prefix, monthRef, previewId) {
     const calEl = container.querySelector(`#${calId}`)
     if (!calEl) return
@@ -251,28 +390,16 @@ export function renderParticipantForm(container, editingId = null) {
       if (el.classList.contains('past')) return
       el.addEventListener('click', () => {
         const date = el.dataset.date
-        const avArr  = formData[availField]
-        const unArr  = formData[unavailField]
-        // unavailField に同じ日があるかチェック（日付部分のみ比較）
-        const hasUnavail = unArr.some(e => getDatePart(e) === date)
-        if (avArr.includes(date)) {
-          formData[availField] = avArr.filter(d => d !== date)
-        } else if (hasUnavail) {
-          formData[unavailField] = unArr.filter(e => getDatePart(e) !== date)
-        } else {
-          formData[availField].push(date)
-        }
-        calEl.innerHTML = renderCalendar(monthRef, availField, unavailField, prefix)
-        attachCalendarEvents(calId, availField, unavailField, prefix, monthRef, previewId)
-        renderPreview(availField, unavailField, previewId)
-      })
-      el.addEventListener('contextmenu', (e) => {
-        showUnavailPopup(e, el.dataset.date, unavailField, availField, calId, monthRef, previewId)
+        openDayModal(date, availField, unavailField, () => {
+          calEl.innerHTML = renderCalendar(monthRef, availField, unavailField, prefix)
+          attachCalendarEvents(calId, availField, unavailField, prefix, monthRef, previewId)
+          renderPreview(availField, unavailField, previewId)
+        })
       })
     })
   }
 
-  // render() の中にすべてのイベント登録をまとめる
+  // render()
   function render() {
     container.innerHTML = `
       <div class="participant-form-card">
@@ -316,7 +443,7 @@ export function renderParticipantForm(container, editingId = null) {
               <div id="cal-group">${renderCalendar(currentGroupMonth, 'availableDates', 'unavailableDates', 'grp')}</div>
             </div>
             <div style="margin-top:6px;font-size:0.75rem;color:var(--color-text-muted);line-height:1.7">
-              左クリック: バトル可能 ／ 右クリック: 終日NG or 時間帯NG を選択 ／ 再クリック: クリア
+              日付をクリック → 時間帯ごとに「可能」「NG」を設定
             </div>
             <div id="preview-group" style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap"></div>
           </div>
@@ -328,7 +455,7 @@ export function renderParticipantForm(container, editingId = null) {
               <div id="cal-tournament">${renderCalendar(currentTournamentMonth, 'tournamentAvailableDates', 'tournamentUnavailableDates', 'trn')}</div>
             </div>
             <div style="margin-top:6px;font-size:0.75rem;color:var(--color-text-muted);line-height:1.7">
-              左クリック: バトル可能 ／ 右クリック: 終日NG or 時間帯NG を選択 ／ 再クリック: クリア
+              日付をクリック → 時間帯ごとに「可能」「NG」を設定
             </div>
             <div id="preview-tournament" style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap"></div>
           </div>
@@ -351,7 +478,7 @@ export function renderParticipantForm(container, editingId = null) {
       container.querySelector('#f-img-file')?.click()
     })
 
-    // ファイル選択 → Base64変換してプレビュー＆formDataに保存
+    // ファイル選択 → Base64変換
     container.querySelector('#f-img-file')?.addEventListener('change', (e) => {
       const file = e.target.files?.[0]
       if (!file) return
@@ -363,17 +490,15 @@ export function renderParticipantForm(container, editingId = null) {
       reader.onload = (ev) => {
         const base64 = ev.target.result
         formData.profileImageUrl = base64
-        // URLフィールドをクリア（アップロード優先）
         const urlInput = container.querySelector('#f-img')
         if (urlInput) urlInput.value = ''
-        // プレビュー更新
         updateImgPreview(base64, `✅ ${file.name}`)
         showToast('画像をアップロードしました', 'success')
       }
       reader.readAsDataURL(file)
     })
 
-    // 画像URLのリアルタイムプレビュー
+    // 画像URLリアルタイムプレビュー
     container.querySelector('#f-img')?.addEventListener('input', (e) => {
       const raw = e.target.value.trim()
       const src = convertImageUrl(raw)
@@ -381,10 +506,7 @@ export function renderParticipantForm(container, editingId = null) {
         formData.profileImageUrl = src
         updateImgPreview(src, 'URL設定済み')
       } else {
-        // URLが空になったらBase64も持ってなければ未設定
-        if (!formData.profileImageUrl?.startsWith('data:')) {
-          formData.profileImageUrl = ''
-        }
+        if (!formData.profileImageUrl?.startsWith('data:')) formData.profileImageUrl = ''
         updateImgPreview('', '未設定')
       }
     })
@@ -415,7 +537,6 @@ export function renderParticipantForm(container, editingId = null) {
     const form = container.querySelector('#participant-form')
     form.addEventListener('submit', (e) => {
       e.preventDefault()
-
       const nameVal  = container.querySelector('#f-name').value.trim()
       const salesVal = Number(container.querySelector('#f-sales').value)
       if (!nameVal || isNaN(salesVal)) return
@@ -423,12 +544,8 @@ export function renderParticipantForm(container, editingId = null) {
       formData.name      = nameVal
       formData.sales     = salesVal
       formData.tiktokUrl = container.querySelector('#f-tiktok').value.trim()
-      // Base64アップロード済みの場合はformDataのまま使用。URLが入力されている場合は変換する
-      const urlInputVal = container.querySelector('#f-img').value.trim()
-      if (urlInputVal) {
-        formData.profileImageUrl = convertImageUrl(urlInputVal)
-      }
-      // formData.profileImageUrl はファイルアップロード時にすでにBase64がセットされている
+      const urlInputVal  = container.querySelector('#f-img').value.trim()
+      if (urlInputVal) formData.profileImageUrl = convertImageUrl(urlInputVal)
 
       if (editing) {
         store.updateTournament(ct => ({
@@ -445,11 +562,8 @@ export function renderParticipantForm(container, editingId = null) {
           groupId: null,
           createdAt: new Date().toISOString()
         }
-        // storeを更新（これによりParticipantListのrenderが走る）
         store.updateTournament(ct => ({ participants: [...ct.participants, participant] }))
         showToast(`${formData.name} を追加しました`, 'success')
-
-        // formDataをリセットしてフォームを再描画
         formData = {
           name: '', sales: '', tiktokUrl: '', profileImageUrl: '',
           availableDates: [], unavailableDates: [],
@@ -459,7 +573,6 @@ export function renderParticipantForm(container, editingId = null) {
       }
     })
 
-    // キャンセルボタン
     container.querySelector('#cancel-edit-btn')?.addEventListener('click', () => {
       container.dispatchEvent(new CustomEvent('edit-done'))
     })

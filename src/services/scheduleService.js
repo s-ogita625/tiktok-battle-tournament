@@ -1,10 +1,16 @@
-import { intersectDates, filterOutDates, isWeekend, isFriday, compareDates, getDatePart, isBlockedBy } from '../utils/dateUtils.js'
+import { intersectDates, filterOutDates, isWeekend, isFriday, compareDates, getDatePart, isBlockedBy, isAllowedBy, getTimePart } from '../utils/dateUtils.js'
 
 /**
  * 共通の候補日+時刻を選ぶ共通ロジック
+ * availEntries: 可能日エントリ配列（終日 or 時間帯付き）
  * unavailEntries: NG日エントリ配列（終日 or 時間帯付き）
+ *
+ * 優先ルール：
+ * 1. 両者の可能日に日付が一致
+ * 2. その日のNG時間帯を除外
+ * 3. 可能日に時間帯指定があれば、その時間帯のみOK（両者の和集合）
  */
-function pickBestDateAndTime(candidates, allTimes, existingBattles, unavailEntries = []) {
+function pickBestDateAndTime(candidates, allTimes, existingBattles, unavailEntries = [], availEntries1 = [], availEntries2 = []) {
   if (candidates.length === 0) {
     return { date: null, time: allTimes[0] }
   }
@@ -22,16 +28,28 @@ function pickBestDateAndTime(candidates, allTimes, existingBattles, unavailEntri
 
   scored.sort((a, b) => b.score - a.score)
 
-  // スコア上位の日付から、時刻がすべてブロックされていない日を選ぶ
   for (const { date } of scored) {
     const usedTimes = existingBattles
       .filter(b => b.scheduledDate === date)
       .map(b => b.scheduledTime)
 
-    const time = allTimes.find(t =>
-      !usedTimes.includes(t) &&
-      !unavailEntries.some(e => isBlockedBy(e, date, t))
-    )
+    // 可能日エントリのうちこの日付のもの
+    const dayAvail1 = availEntries1.filter(e => getDatePart(e) === date)
+    const dayAvail2 = availEntries2.filter(e => getDatePart(e) === date)
+
+    // どちらかが時間帯指定の可能日を持つかチェック
+    const hasTimedAvail1 = dayAvail1.some(e => !!getTimePart(e))
+    const hasTimedAvail2 = dayAvail2.some(e => !!getTimePart(e))
+
+    const time = allTimes.find(t => {
+      if (usedTimes.includes(t)) return false
+      if (unavailEntries.some(e => isBlockedBy(e, date, t))) return false
+      // p1 が時間帯指定の可能日を持つ場合、その時間帯内でないとNG
+      if (hasTimedAvail1 && !dayAvail1.some(e => isAllowedBy(e, date, t))) return false
+      // p2 が時間帯指定の可能日を持つ場合、その時間帯内でないとNG
+      if (hasTimedAvail2 && !dayAvail2.some(e => isAllowedBy(e, date, t))) return false
+      return true
+    })
     if (time !== undefined) return { date, time }
   }
 
@@ -59,15 +77,19 @@ export function scheduleGroupBattles(p1, p2, settings, existingBattles = []) {
   const unavail2 = p2.unavailableDates || []
   const allTimes = settings.defaultBattleTimes || ['21:00', '21:30', '22:00', '22:30', '23:00', '23:30']
 
-  // 終日NG（時間帯なし）の日付のみ候補から除外
+  // 終日NG or 時間帯NG
   const allUnavail = [...unavail1, ...unavail2]
+  // 終日NG の日付は候補から完全除外
   const allDayUnavail = allUnavail.filter(e => !e.includes('|'))
 
-  let candidates = intersectDates(avail1, avail2)
+  // 可能日：日付部分のみで共通候補を作る（時間帯指定も含む）
+  const avail1Dates = avail1.map(e => getDatePart(e))
+  const avail2Dates = avail2.map(e => getDatePart(e))
+  let candidates = intersectDates(avail1Dates, avail2Dates)
   candidates = filterOutDates(candidates, allDayUnavail.map(e => getDatePart(e)))
-  candidates.sort(compareDates)
+  candidates = [...new Set(candidates)].sort(compareDates)
 
-  return pickBestDateAndTime(candidates, allTimes, existingBattles, allUnavail)
+  return pickBestDateAndTime(candidates, allTimes, existingBattles, allUnavail, avail1, avail2)
 }
 
 /**
@@ -95,9 +117,11 @@ export function scheduleTournamentBattle(p1, p2, settings, existingBattles = [])
   const allUnavail = [...unavail1, ...unavail2]
   const allDayUnavail = allUnavail.filter(e => !e.includes('|'))
 
-  let candidates = intersectDates(avail1, avail2)
+  const avail1Dates = avail1.map(e => getDatePart(e))
+  const avail2Dates = avail2.map(e => getDatePart(e))
+  let candidates = intersectDates(avail1Dates, avail2Dates)
   candidates = filterOutDates(candidates, allDayUnavail.map(e => getDatePart(e)))
-  candidates.sort(compareDates)
+  candidates = [...new Set(candidates)].sort(compareDates)
 
-  return pickBestDateAndTime(candidates, allTimes, existingBattles, allUnavail)
+  return pickBestDateAndTime(candidates, allTimes, existingBattles, allUnavail, avail1, avail2)
 }

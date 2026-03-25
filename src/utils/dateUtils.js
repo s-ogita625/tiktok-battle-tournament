@@ -49,24 +49,49 @@ export function compareDates(a, b) {
   return a < b ? -1 : a > b ? 1 : 0
 }
 
-// NG日エントリから日付部分のみ取得 "YYYY-MM-DD" または "YYYY-MM-DD|HH:MM-HH:MM"
+// 日程エントリから日付部分のみ取得 "YYYY-MM-DD" または "YYYY-MM-DD|HH:MM-HH:MM[,HH:MM-HH:MM...]"
 export function getDatePart(entry) {
   return entry ? entry.split('|')[0] : ''
 }
 
-// NG日エントリから時間帯部分を取得（なければ null）"HH:MM-HH:MM" or null
+// 日程エントリから時間帯部分を取得（なければ null）
+// 複数時間帯は "HH:MM-HH:MM,HH:MM-HH:MM" のようにカンマ区切り
+// 単一の場合も "HH:MM-HH:MM" の文字列で返す
 export function getTimePart(entry) {
   if (!entry || !entry.includes('|')) return null
   return entry.split('|')[1] || null
 }
 
-// 時間帯付きNG日エントリを生成
+// 時間帯部分を配列で取得 [{start, end}, ...]
+export function getTimeRanges(entry) {
+  const timePart = getTimePart(entry)
+  if (!timePart) return []
+  return timePart.split(',').map(r => {
+    const [start, end] = r.split('-')
+    return { start, end }
+  })
+}
+
+// 時間帯付き日程エントリを生成
+// timeRanges: [{start, end}, ...] または "HH:MM-HH:MM" 文字列
+export function makeAvailEntry(date, timeRanges = null) {
+  if (!timeRanges || (Array.isArray(timeRanges) && timeRanges.length === 0)) return date
+  if (typeof timeRanges === 'string') return `${date}|${timeRanges}`
+  return `${date}|${timeRanges.map(r => `${r.start}-${r.end}`).join(',')}`
+}
+
+// 時間帯付きNG日エントリを生成（後方互換）
 export function makeUnavailEntry(date, timeRange = null) {
   return timeRange ? `${date}|${timeRange}` : date
 }
 
+// エントリが終日かどうか（時間帯指定なし）
+export function isAllDayEntry(entry) {
+  return !entry.includes('|')
+}
+
 // バトル候補日・時刻が NG日エントリにブロックされるかチェック
-// entry: "YYYY-MM-DD" または "YYYY-MM-DD|HH:MM-HH:MM"
+// entry: "YYYY-MM-DD" または "YYYY-MM-DD|HH:MM-HH:MM[,HH:MM-HH:MM...]"
 // battleTime: "HH:MM" (undefined なら終日比較)
 export function isBlockedBy(entry, battleDate, battleTime) {
   const datePart = getDatePart(entry)
@@ -76,7 +101,29 @@ export function isBlockedBy(entry, battleDate, battleTime) {
   if (!timePart) return true
   // battleTime が未指定なら時間帯NG日は「部分的なNG」とみなしブロックしない
   if (!battleTime) return false
-  // バトル時刻が NG時間帯に含まれるか
-  const [ngStart, ngEnd] = timePart.split('-')
-  return battleTime >= ngStart && battleTime < ngEnd
+  // 複数時間帯NGのどれかに含まれるか
+  const ranges = timePart.split(',').map(r => {
+    const [s, e] = r.split('-')
+    return { s, e }
+  })
+  return ranges.some(({ s, e }) => battleTime >= s && battleTime < e)
+}
+
+// バトル候補日・時刻が 可能日エントリで許可されているかチェック
+// 可能日に時間帯指定がある場合、その時間帯内のみOK
+// 可能日が終日ならすべてOK
+export function isAllowedBy(availEntry, battleDate, battleTime) {
+  const datePart = getDatePart(availEntry)
+  if (datePart !== battleDate) return false
+  const timePart = getTimePart(availEntry)
+  // 時間帯指定なし → 終日OK
+  if (!timePart) return true
+  // battleTime が未指定なら日付一致でOK
+  if (!battleTime) return true
+  // 複数時間帯のいずれかに含まれるか
+  const ranges = timePart.split(',').map(r => {
+    const [s, e] = r.split('-')
+    return { s, e }
+  })
+  return ranges.some(({ s, e }) => battleTime >= s && battleTime < e)
 }
