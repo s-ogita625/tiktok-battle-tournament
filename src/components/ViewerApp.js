@@ -444,8 +444,8 @@ function renderGroupCard(group, participants) {
         <tbody>
           ${standings.length > 0
             ? (() => {
-                // 1試合以上結果が出ているかチェック
-                const hasBattleResult = standings.some(s => (s.wins + s.losses) > 0)
+                // 1試合以上結果が出ているかチェック（引き分けも含む）
+                const hasBattleResult = standings.some(s => (s.wins + s.losses + (s.draws || 0)) > 0)
                 return standings.map(s => {
                   const p = participants.find(x => x.id === s.participantId)
                   const isAdv = s.rank <= (group.advanceCount || 1)
@@ -453,7 +453,7 @@ function renderGroupCard(group, participants) {
                   const showAdv = isAdv && hasBattleResult
                   return `
                     <tr class="${showAdv ? 'viewer-row-advance' : ''}">
-                      <td>${s.rank}</td>
+                      <td>${hasBattleResult ? s.rank : '-'}</td>
                       <td>
                         <div style="display:flex;align-items:center;gap:6px">
                           ${p?.profileImageUrl

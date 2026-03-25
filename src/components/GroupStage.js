@@ -96,7 +96,10 @@ function renderGroupCard(group, participants, settings) {
           </thead>
           <tbody>
             ${standings.length > 0
-              ? standings.map(s => renderStandingRow(s, group, participants)).join('')
+              ? (() => {
+                  const hasBattleResult = standings.some(s => (s.wins + s.losses + (s.draws || 0)) > 0)
+                  return standings.map(s => renderStandingRow(s, group, participants, hasBattleResult)).join('')
+                })()
               : group.participantIds.map((id, i) => {
                   const p = participants.find(x => x.id === id)
                   return renderEmptyStandingRow(p, i + 1)
@@ -133,12 +136,12 @@ function renderGroupCard(group, participants, settings) {
   `
 }
 
-function renderStandingRow(standing, group, participants) {
+function renderStandingRow(standing, group, participants, hasBattleResult = true) {
   const p = participants.find(x => x.id === standing.participantId)
   if (!p) return ''
   const isAdvancer = standing.rank <= (group.advanceCount || 1)
-  const advanceMarker = isAdvancer ? `<span class="advance-indicator" title="進出確定"></span>` : ''
-  const rankClass = standing.rank <= 3 ? `rank-${standing.rank}` : 'rank-other'
+  const advanceMarker = isAdvancer && hasBattleResult ? `<span class="advance-indicator" title="進出確定"></span>` : ''
+  const rankClass = hasBattleResult && standing.rank <= 3 ? `rank-${standing.rank}` : 'rank-other'
 
   const standImgSrc = p.profileImageUrl ? (p.profileImageUrl.startsWith('data:') ? p.profileImageUrl : convertImageUrl(p.profileImageUrl)) : ''
   const avatarHtml = standImgSrc
@@ -149,7 +152,7 @@ function renderStandingRow(standing, group, participants) {
     <tr>
       <td>
         <div class="standing-player">
-          <div class="standing-rank ${rankClass}">${standing.rank}</div>
+          <div class="standing-rank ${rankClass}">${hasBattleResult ? standing.rank : '-'}</div>
           ${avatarHtml}
           <span style="font-size:0.82rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80px">${escHtml(p.name)}</span>
           ${advanceMarker}
