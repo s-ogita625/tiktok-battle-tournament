@@ -107,7 +107,22 @@ function renderGroupCard(group, participants, settings) {
       </div>
 
       <div class="group-battles" data-group-id="${group.id}">
-        ${group.battles.map(battle => {
+        ${[...group.battles].sort((a, b) => {
+          // 日時未定は末尾へ
+          const aHasDate = !!a.scheduledDate
+          const bHasDate = !!b.scheduledDate
+          if (!aHasDate && !bHasDate) return 0
+          if (!aHasDate) return 1
+          if (!bHasDate) return -1
+          // 日付比較
+          if (a.scheduledDate !== b.scheduledDate) {
+            return a.scheduledDate < b.scheduledDate ? -1 : 1
+          }
+          // 同日なら時刻比較（未設定は末尾）
+          const aTime = a.scheduledTime || '99:99'
+          const bTime = b.scheduledTime || '99:99'
+          return aTime < bTime ? -1 : aTime > bTime ? 1 : 0
+        }).map(battle => {
           const p1 = participants.find(p => p.id === battle.participant1Id)
           const p2 = participants.find(p => p.id === battle.participant2Id)
           if (!p1 || !p2) return ''
