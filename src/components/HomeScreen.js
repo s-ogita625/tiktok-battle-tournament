@@ -66,15 +66,27 @@ export function renderHomeScreen(container, onEnterTournament) {
               <label class="form-label">バトル開始時刻（デフォルト）</label>
               <div id="times-list" style="display:flex;flex-direction:column;gap:8px;margin-top:6px">
                 <div style="display:flex;gap:8px;align-items:center">
-                  <input class="form-input time-entry" type="time" value="19:00" style="width:130px" />
-                  <button type="button" class="btn btn-danger btn-sm remove-time" style="padding:6px 10px">✕</button>
-                </div>
-                <div style="display:flex;gap:8px;align-items:center">
-                  <input class="form-input time-entry" type="time" value="20:00" style="width:130px" />
-                  <button type="button" class="btn btn-danger btn-sm remove-time" style="padding:6px 10px">✕</button>
-                </div>
-                <div style="display:flex;gap:8px;align-items:center">
                   <input class="form-input time-entry" type="time" value="21:00" style="width:130px" />
+                  <button type="button" class="btn btn-danger btn-sm remove-time" style="padding:6px 10px">✕</button>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <input class="form-input time-entry" type="time" value="21:30" style="width:130px" />
+                  <button type="button" class="btn btn-danger btn-sm remove-time" style="padding:6px 10px">✕</button>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <input class="form-input time-entry" type="time" value="22:00" style="width:130px" />
+                  <button type="button" class="btn btn-danger btn-sm remove-time" style="padding:6px 10px">✕</button>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <input class="form-input time-entry" type="time" value="22:30" style="width:130px" />
+                  <button type="button" class="btn btn-danger btn-sm remove-time" style="padding:6px 10px">✕</button>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <input class="form-input time-entry" type="time" value="23:00" style="width:130px" />
+                  <button type="button" class="btn btn-danger btn-sm remove-time" style="padding:6px 10px">✕</button>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <input class="form-input time-entry" type="time" value="23:30" style="width:130px" />
                   <button type="button" class="btn btn-danger btn-sm remove-time" style="padding:6px 10px">✕</button>
                 </div>
               </div>
@@ -106,7 +118,7 @@ export function renderHomeScreen(container, onEnterTournament) {
       const row = document.createElement('div')
       row.style.cssText = 'display:flex;gap:8px;align-items:center'
       row.innerHTML = `
-        <input class="form-input time-entry" type="time" value="20:00" style="width:130px" />
+        <input class="form-input time-entry" type="time" value="21:00" style="width:130px" />
         <button type="button" class="btn btn-danger btn-sm remove-time" style="padding:6px 10px">✕</button>
       `
       list.appendChild(row)
@@ -152,7 +164,7 @@ export function renderHomeScreen(container, onEnterTournament) {
         createdAt: new Date().toISOString(),
         settings: {
           tournamentSize: selectedSize,
-          defaultBattleTimes: times.length > 0 ? times : ['19:00', '20:00', '21:00']
+          defaultBattleTimes: times.length > 0 ? times : ['21:00', '21:30', '22:00', '22:30', '23:00', '23:30']
         }
       }
 
