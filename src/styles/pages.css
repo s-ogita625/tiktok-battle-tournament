@@ -1454,12 +1454,29 @@
     grid-template-columns: 1fr;
   }
 
-  /* 対戦カードのプレイヤー名を省略 */
-  .viewer-battle-players span:not(.viewer-battle-score) {
-    max-width: 90px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  /* スマホ：ライバーチップを小さく */
+  .viewer-filter-chip {
+    min-width: 58px;
+    padding: 6px 7px;
+  }
+  .viewer-chip-avatar,
+  .viewer-chip-avatar-init {
+    width: 38px;
+    height: 38px;
+  }
+  .viewer-chip-name {
+    font-size: 0.65rem;
+    max-width: 60px;
+  }
+  /* スマホ：対戦カードのアバターを小さく */
+  .viewer-battle-avatar-wrap {
+    width: 38px;
+    height: 38px;
+  }
+  .viewer-battle-avatar,
+  .viewer-battle-avatar-init {
+    width: 34px;
+    height: 34px;
   }
 }
 
@@ -1598,97 +1615,175 @@
 .viewer-tiktok-link { font-size: 0.75rem; color: var(--color-secondary); text-decoration: none; }
 .viewer-tiktok-link:hover { text-decoration: underline; }
 
-/* グループビュー フィルターバー */
+/* グループビュー フィルターバー（ライバーカード選択式） */
 .viewer-groups-filter-bar {
-  position: relative;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
-.viewer-groups-filter-inner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.viewer-filter-input {
-  flex: 1;
-  padding: 8px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface2);
-  color: var(--color-text);
-  font-size: 0.9rem;
-  outline: none;
-  transition: border-color 0.15s;
-}
-.viewer-filter-input:focus {
-  border-color: var(--color-secondary);
-}
-.viewer-filter-input::placeholder {
+.viewer-filter-label {
+  font-size: 0.8rem;
+  font-weight: 600;
   color: var(--color-text-dim);
+  margin-bottom: 10px;
+  letter-spacing: 0.02em;
 }
 
-.viewer-filter-clear-btn {
-  padding: 7px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface3);
-  color: var(--color-text-dim);
-  font-size: 0.82rem;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.15s, color 0.15s;
-}
-.viewer-filter-clear-btn:hover {
-  background: var(--color-danger);
-  color: #fff;
-  border-color: var(--color-danger);
-}
-
-.viewer-filter-candidates {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  background: var(--color-surface2);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
-  z-index: 100;
-  max-height: 200px;
-  overflow-y: auto;
+/* ライバーチップ一覧 */
+.viewer-filter-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  padding: 8px;
+  gap: 10px;
 }
 
-.viewer-filter-candidate {
-  padding: 5px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 20px;
-  background: var(--color-surface3);
+.viewer-filter-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 10px;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface2);
   color: var(--color-text);
-  font-size: 0.85rem;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-  white-space: nowrap;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+  min-width: 68px;
+  text-align: center;
 }
-.viewer-filter-candidate:hover {
-  background: var(--color-secondary);
+.viewer-filter-chip:hover {
   border-color: var(--color-secondary);
-  color: #fff;
+  background: var(--color-surface3);
+  transform: translateY(-2px);
+}
+.viewer-filter-chip.active {
+  border-color: var(--color-secondary);
+  background: color-mix(in srgb, var(--color-secondary) 15%, var(--color-surface2));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-secondary) 25%, transparent);
 }
 
+/* チップ内のアバター */
+.viewer-chip-link {
+  display: block;
+  text-decoration: none;
+  position: relative;
+}
+.viewer-chip-link-nourl {
+  cursor: default;
+}
+.viewer-chip-avatar,
+.viewer-chip-avatar-init {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+.viewer-chip-avatar-init {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+}
+
+.viewer-chip-name {
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.2;
+  max-width: 72px;
+  word-break: break-all;
+  pointer-events: none;
+}
+
+/* フィルターステータス */
 .viewer-filter-status {
-  margin-top: 8px;
+  margin-top: 10px;
   font-size: 0.82rem;
   color: var(--color-secondary);
   font-weight: 600;
-  padding: 4px 8px;
+  padding: 4px 10px;
   background: color-mix(in srgb, var(--color-secondary) 10%, transparent);
   border-radius: var(--radius-sm);
   display: inline-block;
+}
+
+/* 対戦カードのプレイヤー表示（画像付き） */
+.viewer-battle-players {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.viewer-battle-player {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  text-decoration: none;
+  color: inherit;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.viewer-battle-player:hover {
+  opacity: 0.8;
+}
+
+.viewer-battle-avatar-wrap {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  transition: border-color 0.15s;
+}
+.viewer-battle-avatar-wrap.is-winner {
+  border-color: var(--color-secondary);
+}
+.viewer-battle-avatar-wrap.is-loser {
+  opacity: 0.5;
+}
+
+.viewer-battle-avatar,
+.viewer-battle-avatar-init {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+.viewer-battle-avatar-init {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+}
+
+.viewer-battle-crown {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 1rem;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.viewer-battle-name {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
+  word-break: break-all;
+  line-height: 1.2;
+}
+.viewer-battle-winner { color: var(--color-secondary); }
+.viewer-battle-loser  { color: var(--color-text-dim); }
+
+.viewer-battle-score-block {
+  flex: 0 0 auto;
+  text-align: center;
+  padding: 0 4px;
 }
 
 /* グループビュー */
@@ -1759,22 +1854,14 @@
   margin-bottom: 4px;
 }
 
-.viewer-battle-players {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 0.85rem;
-  font-weight: 600;
-}
 .viewer-battle-score {
-  font-size: 0.82rem;
+  font-size: 0.85rem;
+  font-weight: 700;
   color: var(--color-text-muted);
-  min-width: 60px;
+  min-width: 52px;
   text-align: center;
+  display: block;
 }
-.viewer-battle-winner { color: var(--color-secondary); }
-.viewer-battle-loser  { color: var(--color-text-dim); }
 
 /* 対戦日付（ブラケット内） */
 .viewer-match-date {

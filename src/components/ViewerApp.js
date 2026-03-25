@@ -202,131 +202,63 @@ function renderTournamentDetail(container, t) {
   })
 
   // ──────────────────────────────────────────────────────
-  //  グループタブ：ライバー名フィルター
+  //  グループタブ：ライバーカード選択フィルター
   // ──────────────────────────────────────────────────────
-  const filterInput     = container.querySelector('#group-filter-input')
-  const filterClear     = container.querySelector('#group-filter-clear')
-  const filterCandidates = container.querySelector('#group-filter-candidates')
-  const filterStatus    = container.querySelector('#group-filter-status')
+  const filterChips  = container.querySelectorAll('.viewer-filter-chip')
+  const filterStatus = container.querySelector('#group-filter-status')
 
-  if (filterInput) {
-    // すべての参加者名（重複なし）をフィルター候補として保持
-    const allParticipantNames = [...new Set(
-      [...container.querySelectorAll('.viewer-battle-card')].flatMap(card => [
-        card.dataset.p1, card.dataset.p2
-      ]).filter(Boolean)
-    )]
+  if (filterChips.length > 0 && filterStatus) {
+    let activeFilter = ''
 
     /** フィルターを適用して対戦カードを絞り込む */
     function applyFilter(name) {
-      const query = name.trim()
+      activeFilter = name
       const allCards = container.querySelectorAll('.viewer-battle-card')
 
-      if (!query) {
-        // フィルターなし：全カード表示
+      if (!name) {
         allCards.forEach(card => card.style.display = '')
+        container.querySelectorAll('.viewer-group-card').forEach(gc => gc.style.display = '')
         filterStatus.style.display = 'none'
         filterStatus.textContent = ''
-        filterClear.style.display = 'none'
-        // グループカード全体も表示
-        container.querySelectorAll('.viewer-group-card').forEach(gc => gc.style.display = '')
+        filterChips.forEach(c => c.classList.remove('active'))
         return
       }
 
-      filterClear.style.display = ''
-
       let matchCount = 0
       allCards.forEach(card => {
-        const p1 = card.dataset.p1 || ''
-        const p2 = card.dataset.p2 || ''
-        const hit = p1 === query || p2 === query
+        const hit = card.dataset.p1 === name || card.dataset.p2 === name
         card.style.display = hit ? '' : 'none'
         if (hit) matchCount++
       })
 
-      // 対戦カードが1件もないグループカードは非表示に
+      // 対戦が1件もないグループカードを非表示
       container.querySelectorAll('.viewer-group-card').forEach(gc => {
         const visible = [...gc.querySelectorAll('.viewer-battle-card')].some(c => c.style.display !== 'none')
         gc.style.display = visible ? '' : 'none'
       })
 
       filterStatus.style.display = ''
-      filterStatus.textContent = `「${query}」の対戦：${matchCount}件`
+      filterStatus.textContent = `「${name}」の対戦：${matchCount}件`
     }
 
-    // テキスト入力イベント：候補リストを絞り込み表示
-    filterInput.addEventListener('input', () => {
-      const val = filterInput.value.trim()
+    // ライバーカードのクリック：選択 or 解除トグル
+    filterChips.forEach(chip => {
+      chip.addEventListener('click', e => {
+        // TikTokリンクのクリックはフィルター操作しない
+        if (e.target.closest('.viewer-chip-link') && e.target.closest('a')) return
 
-      if (val === '') {
-        filterCandidates.style.display = 'none'
-        applyFilter('')
-        return
-      }
-
-      // 前方一致で候補を絞り込む
-      const matched = allParticipantNames.filter(name =>
-        name.includes(val) || name.toLowerCase().includes(val.toLowerCase())
-      )
-
-      // 候補ボタンの表示を更新
-      filterCandidates.querySelectorAll('.viewer-filter-candidate').forEach(btn => {
-        const name = btn.dataset.name || ''
-        const hit = matched.includes(name)
-        btn.style.display = hit ? '' : 'none'
-      })
-
-      const hasVisible = matched.length > 0
-      filterCandidates.style.display = hasVisible ? '' : 'none'
-
-      // 完全一致する名前があればすぐにフィルター実行
-      if (matched.length === 1 && matched[0] === val) {
-        applyFilter(val)
-      } else if (allParticipantNames.includes(val)) {
-        applyFilter(val)
-      } else {
-        // まだ入力途中なのでカードは非表示にしない（全表示のまま）
-        applyFilter('')
-        filterClear.style.display = val ? '' : 'none'
-      }
-    })
-
-    // Enterキー：そのまま確定
-    filterInput.addEventListener('keydown', e => {
-      if (e.key === 'Enter') {
-        filterCandidates.style.display = 'none'
-        applyFilter(filterInput.value)
-      }
-      if (e.key === 'Escape') {
-        filterCandidates.style.display = 'none'
-        filterInput.value = ''
-        applyFilter('')
-      }
-    })
-
-    // 候補ボタンクリック：名前をセットして絞り込み実行
-    filterCandidates.querySelectorAll('.viewer-filter-candidate').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const name = btn.dataset.name || ''
-        filterInput.value = name
-        filterCandidates.style.display = 'none'
-        applyFilter(name)
+        const name = chip.dataset.name || ''
+        if (activeFilter === name) {
+          // 同じカードを再クリック → フィルター解除
+          filterChips.forEach(c => c.classList.remove('active'))
+          applyFilter('')
+        } else {
+          filterChips.forEach(c => c.classList.remove('active'))
+          chip.classList.add('active')
+          applyFilter(name)
+        }
       })
     })
-
-    // クリアボタン：リセット
-    filterClear.addEventListener('click', () => {
-      filterInput.value = ''
-      filterCandidates.style.display = 'none'
-      applyFilter('')
-    })
-
-    // 入力欄外クリックで候補を閉じる
-    document.addEventListener('click', e => {
-      if (!filterInput.contains(e.target) && !filterCandidates.contains(e.target)) {
-        filterCandidates.style.display = 'none'
-      }
-    }, { once: false })
   }
 }
 
@@ -375,27 +307,25 @@ function renderGroupsView(groups, participants) {
     return `<div class="viewer-empty-section">グループ情報がありません</div>`
   }
 
-  // 参加者名リスト（フィルター候補）
-  const allNames = participants.map(p => escHtml(p.name))
-
   return `
     <div class="viewer-groups-filter-bar">
-      <div class="viewer-groups-filter-inner">
-        <input
-          type="text"
-          id="group-filter-input"
-          class="viewer-filter-input"
-          placeholder="🔍 ライバー名で絞り込み..."
-          autocomplete="off"
-        />
-        <button id="group-filter-clear" class="viewer-filter-clear-btn" style="display:none">✕ クリア</button>
-      </div>
-      <div id="group-filter-candidates" class="viewer-filter-candidates" style="display:none">
-        ${participants.map(p => `
-          <button class="viewer-filter-candidate" data-name="${escHtml(p.name)}">
-            ${escHtml(p.name)}
-          </button>
-        `).join('')}
+      <div class="viewer-filter-label">🔍 ライバーを選んで絞り込み</div>
+      <div class="viewer-filter-chips" id="group-filter-chips">
+        ${participants.map(p => {
+          const imgSrc = convertImageUrl(p.profileImageUrl || '')
+          const avatarHtml = imgSrc
+            ? `<img class="viewer-chip-avatar" src="${escHtml(imgSrc)}" alt="${escHtml(p.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="avatar-initials viewer-chip-avatar-init" style="display:none">${p.name.slice(0,2)}</div>`
+            : `<div class="avatar-initials viewer-chip-avatar-init">${p.name.slice(0,2)}</div>`
+          const wrap = p.tiktokUrl
+            ? `<a href="${escHtml(p.tiktokUrl)}" target="_blank" rel="noopener" class="viewer-chip-link" title="TikTokを開く">${avatarHtml}</a>`
+            : `<div class="viewer-chip-link viewer-chip-link-nourl">${avatarHtml}</div>`
+          return `
+            <button class="viewer-filter-chip" data-name="${escHtml(p.name)}" title="${escHtml(p.name)}">
+              ${wrap}
+              <span class="viewer-chip-name">${escHtml(p.name)}</span>
+            </button>
+          `
+        }).join('')}
       </div>
       <div id="group-filter-status" class="viewer-filter-status" style="display:none"></div>
     </div>
@@ -469,6 +399,24 @@ function renderGroupCard(group, participants) {
           if (!p1 || !p2) return ''
           const isDone = !!battle.result
           const w = battle.result?.winnerId
+
+          const renderBattlePlayer = (p, isWinner, isLoser) => {
+            const imgSrc = convertImageUrl(p.profileImageUrl || '')
+            const avatarHtml = imgSrc
+              ? `<img class="viewer-battle-avatar" src="${escHtml(imgSrc)}" alt="${escHtml(p.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="avatar-initials viewer-battle-avatar-init" style="display:none">${p.name.slice(0,2)}</div>`
+              : `<div class="avatar-initials viewer-battle-avatar-init">${p.name.slice(0,2)}</div>`
+            const inner = `
+              <div class="viewer-battle-avatar-wrap ${isWinner ? 'is-winner' : isLoser ? 'is-loser' : ''}">
+                ${isWinner ? '<div class="viewer-battle-crown">👑</div>' : ''}
+                ${avatarHtml}
+              </div>
+              <span class="viewer-battle-name ${isWinner ? 'viewer-battle-winner' : isLoser ? 'viewer-battle-loser' : ''}">${escHtml(p.name)}</span>
+            `
+            return p.tiktokUrl
+              ? `<a href="${escHtml(p.tiktokUrl)}" target="_blank" rel="noopener" class="viewer-battle-player">${inner}</a>`
+              : `<div class="viewer-battle-player">${inner}</div>`
+          }
+
           return `
             <div class="viewer-battle-card ${isDone ? 'is-done' : ''}"
                  data-p1="${escHtml(p1.name)}" data-p2="${escHtml(p2.name)}">
@@ -477,13 +425,15 @@ function renderGroupCard(group, participants) {
                 ${battle.scheduledTime ? battle.scheduledTime + '〜' : ''}
               </div>
               <div class="viewer-battle-players">
-                <span class="${w === p1.id ? 'viewer-battle-winner' : w ? 'viewer-battle-loser' : ''}">${escHtml(p1.name)}</span>
-                <span class="viewer-battle-score">
-                  ${isDone
-                    ? `${battle.result.score1 ?? '-'} - ${battle.result.score2 ?? '-'}`
-                    : 'vs'}
-                </span>
-                <span class="${w === p2.id ? 'viewer-battle-winner' : w ? 'viewer-battle-loser' : ''}">${escHtml(p2.name)}</span>
+                ${renderBattlePlayer(p1, w === p1.id, !!(w && w !== p1.id))}
+                <div class="viewer-battle-score-block">
+                  <span class="viewer-battle-score">
+                    ${isDone
+                      ? `${battle.result.score1 ?? '-'} - ${battle.result.score2 ?? '-'}`
+                      : 'vs'}
+                  </span>
+                </div>
+                ${renderBattlePlayer(p2, w === p2.id, !!(w && w !== p2.id))}
               </div>
             </div>
           `
