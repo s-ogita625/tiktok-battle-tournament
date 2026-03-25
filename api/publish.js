@@ -55,10 +55,11 @@ export default async function handler(req, res) {
         id:              p.id,
         name:            p.name,
         tiktokUrl:       p.tiktokUrl  || '',
-        // Base64データURLは容量が大きくGistの制限に引っかかるため除外
-        // 通常のhttps://URLのみ公開データに含める
-        // Base64データURLもそのまま含める（Gist は最大 10MB まで対応）
-        profileImageUrl: p.profileImageUrl || '',
+        // Base64データURL（data:image/...）は Vercel リクエストボディ上限（4.5MB）を超えるため除外
+        // https:// URL のみ公開データに含める（管理画面ではBase64のまま表示可能）
+        profileImageUrl: (p.profileImageUrl && !p.profileImageUrl.startsWith('data:'))
+          ? p.profileImageUrl
+          : '',
         groupId:         p.groupId    || null,
         availableDates:              p.availableDates             || [],
         unavailableDates:            p.unavailableDates           || [],
