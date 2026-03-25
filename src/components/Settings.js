@@ -73,14 +73,15 @@ export function renderSettings(container) {
         <div class="settings-section">
           <h2 class="settings-section-title">🌐 閲覧ページへ公開</h2>
           <p style="font-size:0.8rem;color:var(--color-text-muted);margin-bottom:12px;line-height:1.6">
-            「公開中」に設定した大会を閲覧ページ（スマホ等）に反映します。<br>
-            ボタンを押すと自動でサーバーが更新します。<br>
+            「公開中」に設定した大会を閲覧ページ（スマホ等）に即座に反映します。<br>
+            ホーム画面の <strong style="color:var(--color-text)">🌐 公開中 / 🔒 非公開</strong> ボタンで大会ごとに公開設定を切り替えてください。<br>
             <span style="color:var(--color-text-dim);font-size:0.75rem">
-              ※ Vercel のデプロイが完了するまで約1〜2分かかります
+              ※ GitHub Gist 経由で配信されます。デプロイ不要・即時反映されます。
             </span>
           </p>
+          ${renderPublishStatus(ct)}
           <div class="data-actions">
-            <button class="btn btn-primary" id="publish-btn">🚀 公開データを更新（Vercelへ反映）</button>
+            <button class="btn btn-primary" id="publish-btn">🚀 閲覧ページに反映する</button>
           </div>
           <div id="publish-result" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;font-size:0.82rem;line-height:1.6;white-space:pre-line"></div>
         </div>
@@ -198,6 +199,21 @@ export function renderSettings(container) {
   }
   container._unsubscribeStore = store.subscribe(render)
   render()
+}
+
+function renderPublishStatus(currentTournament) {
+  const { tournaments } = store.getState()
+  const all = [...(currentTournament ? [currentTournament] : []), ...tournaments]
+  const publicOnes = all.filter(t => t.isPublic)
+  if (publicOnes.length === 0) {
+    return `<div style="padding:10px 14px;border-radius:8px;font-size:0.82rem;margin-bottom:10px;background:rgba(255,193,7,0.1);border:1px solid rgba(255,193,7,0.3);color:#c68000">
+      ⚠️ 現在「公開中」の大会がありません。<br>
+      ホーム画面で大会の「🔒 非公開」ボタンをクリックして公開設定にしてください。
+    </div>`
+  }
+  return `<div style="padding:8px 14px;border-radius:8px;font-size:0.82rem;margin-bottom:10px;background:rgba(76,175,80,0.1);border:1px solid rgba(76,175,80,0.3);color:var(--color-success)">
+    ✅ 公開対象: ${publicOnes.map(t => `「${escHtml(t.title)}」`).join('・')} （${publicOnes.length}件）
+  </div>`
 }
 
 function calcGroupProgress(groups) {

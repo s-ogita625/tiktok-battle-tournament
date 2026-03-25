@@ -87,7 +87,8 @@ export default async function handler(req, res) {
         method: 'PATCH',
         headers,
         body: JSON.stringify({
-          description: 'TikTok Battle Tournament 公開データ',
+          description: 'TikTokBattleTournament-Public',
+          public: true,
           files: { 'tournament-data.json': { content: jsonContent } }
         })
       })
@@ -97,8 +98,8 @@ export default async function handler(req, res) {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          description: 'TikTok Battle Tournament 公開データ',
-          public: false,
+          description: 'TikTokBattleTournament-Public',
+          public: true,
           files: { 'tournament-data.json': { content: jsonContent } }
         })
       })
