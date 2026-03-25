@@ -2,6 +2,7 @@ import { store } from '../data/store.js'
 import { recalcStandings, getTournamentAdvancers } from '../services/groupService.js'
 import { generateTournamentBracket } from '../services/tournamentService.js'
 import { renderBattleCard } from './BattleCard.js'
+import { convertImageUrl } from './ParticipantList.js'
 
 export function renderGroupStage(container) {
   function render() {
@@ -124,8 +125,9 @@ function renderStandingRow(standing, group, participants) {
   const advanceMarker = isAdvancer ? `<span class="advance-indicator" title="進出確定"></span>` : ''
   const rankClass = standing.rank <= 3 ? `rank-${standing.rank}` : 'rank-other'
 
-  const avatarHtml = p.profileImageUrl
-    ? `<img class="avatar" src="${escHtml(p.profileImageUrl)}" width="24" height="24" alt="${escHtml(p.name)}" style="border-radius:50%;object-fit:cover" onerror="this.style.display='none'" />`
+  const standImgSrc = p.profileImageUrl ? (p.profileImageUrl.startsWith('data:') ? p.profileImageUrl : convertImageUrl(p.profileImageUrl)) : ''
+  const avatarHtml = standImgSrc
+    ? `<img class="avatar" src="${escHtml(standImgSrc)}" width="24" height="24" alt="${escHtml(p.name)}" style="border-radius:50%;object-fit:cover" onerror="this.style.display='none'" />`
     : `<div class="avatar-initials" style="width:24px;height:24px;font-size:0.6rem">${p.name.slice(0, 2)}</div>`
 
   return `
@@ -148,8 +150,9 @@ function renderStandingRow(standing, group, participants) {
 function renderEmptyStandingRow(p, rank) {
   if (!p) return ''
   const rankClass = rank <= 3 ? `rank-${rank}` : 'rank-other'
-  const avatarHtml = p.profileImageUrl
-    ? `<img class="avatar" src="${escHtml(p.profileImageUrl)}" width="24" height="24" alt="${escHtml(p.name)}" style="border-radius:50%;object-fit:cover" />`
+  const emptyImgSrc = p.profileImageUrl ? (p.profileImageUrl.startsWith('data:') ? p.profileImageUrl : convertImageUrl(p.profileImageUrl)) : ''
+  const avatarHtml = emptyImgSrc
+    ? `<img class="avatar" src="${escHtml(emptyImgSrc)}" width="24" height="24" alt="${escHtml(p.name)}" style="border-radius:50%;object-fit:cover" />`
     : `<div class="avatar-initials" style="width:24px;height:24px;font-size:0.6rem">${p.name.slice(0, 2)}</div>`
 
   return `

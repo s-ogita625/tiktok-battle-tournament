@@ -1,5 +1,6 @@
 import { store } from '../data/store.js'
 import { recordTournamentResult, resetMatchResult, getRoundName } from '../services/tournamentService.js'
+import { convertImageUrl } from './ParticipantList.js'
 
 export function renderTournamentBracket(container) {
   function render() {
@@ -66,8 +67,11 @@ export function renderTournamentBracket(container) {
 function renderWinnerBanner(winnerId, participants) {
   const p = participants.find(x => x.id === winnerId)
   if (!p) return ''
-  const avatarHtml = p.profileImageUrl
-    ? `<img src="${escHtml(p.profileImageUrl)}" class="tnmt-winner-avatar" alt="${escHtml(p.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="avatar-initials tnmt-winner-initials" style="display:none">${p.name.slice(0,2)}</div>`
+  const winnerImgSrc = p.profileImageUrl
+    ? (p.profileImageUrl.startsWith('data:') ? p.profileImageUrl : convertImageUrl(p.profileImageUrl))
+    : ''
+  const avatarHtml = winnerImgSrc
+    ? `<img src="${escHtml(winnerImgSrc)}" class="tnmt-winner-avatar" alt="${escHtml(p.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="avatar-initials tnmt-winner-initials" style="display:none">${p.name.slice(0,2)}</div>`
     : `<div class="avatar-initials tnmt-winner-initials">${p.name.slice(0,2)}</div>`
   return `
     <div class="tnmt-winner-banner">
@@ -164,8 +168,11 @@ function renderBracketPlayer(p, playerId, winnerId, score, isBye, slot) {
   const isWinner = winnerId === playerId
   const isLoser  = winnerId && winnerId !== playerId && !isBye
 
-  const avatarHtml = p.profileImageUrl
-    ? `<img src="${escHtml(p.profileImageUrl)}" class="bracket-player-avatar" alt="${escHtml(p.name)}"
+  const bracketImgSrc = p.profileImageUrl
+    ? (p.profileImageUrl.startsWith('data:') ? p.profileImageUrl : convertImageUrl(p.profileImageUrl))
+    : ''
+  const avatarHtml = bracketImgSrc
+    ? `<img src="${escHtml(bracketImgSrc)}" class="bracket-player-avatar" alt="${escHtml(p.name)}"
            onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
        <div class="avatar-initials bracket-player-avatar-init" style="display:none">${p.name.slice(0,2)}</div>`
     : `<div class="avatar-initials bracket-player-avatar-init">${p.name.slice(0,2)}</div>`
@@ -305,11 +312,13 @@ function openScoreModal(container, matchId, rounds, participants) {
 
   title.textContent = `${p1.name} vs ${p2.name}`
 
-  const av1 = p1.profileImageUrl
-    ? `<img src="${escHtml(p1.profileImageUrl)}" class="modal-player-avatar" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="avatar-initials modal-player-avatar" style="display:none">${p1.name.slice(0,2)}</div>`
+  const img1src = p1.profileImageUrl ? (p1.profileImageUrl.startsWith('data:') ? p1.profileImageUrl : convertImageUrl(p1.profileImageUrl)) : ''
+  const img2src = p2.profileImageUrl ? (p2.profileImageUrl.startsWith('data:') ? p2.profileImageUrl : convertImageUrl(p2.profileImageUrl)) : ''
+  const av1 = img1src
+    ? `<img src="${escHtml(img1src)}" class="modal-player-avatar" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="avatar-initials modal-player-avatar" style="display:none">${p1.name.slice(0,2)}</div>`
     : `<div class="avatar-initials modal-player-avatar">${p1.name.slice(0,2)}</div>`
-  const av2 = p2.profileImageUrl
-    ? `<img src="${escHtml(p2.profileImageUrl)}" class="modal-player-avatar" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="avatar-initials modal-player-avatar" style="display:none">${p2.name.slice(0,2)}</div>`
+  const av2 = img2src
+    ? `<img src="${escHtml(img2src)}" class="modal-player-avatar" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="avatar-initials modal-player-avatar" style="display:none">${p2.name.slice(0,2)}</div>`
     : `<div class="avatar-initials modal-player-avatar">${p2.name.slice(0,2)}</div>`
 
   body.innerHTML = `

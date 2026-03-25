@@ -1,4 +1,5 @@
 import { formatDate } from '../utils/dateUtils.js'
+import { convertImageUrl } from './ParticipantList.js'
 
 /**
  * 対戦カードHTMLを生成する
@@ -64,8 +65,11 @@ export function renderBattleCard(battle, p1, p2, editable = true) {
 }
 
 function renderPlayerLink(p, isWinner, side) {
-  const avatarHtml = p.profileImageUrl
-    ? `<img class="battle-player-avatar" src="${escHtml(p.profileImageUrl)}" alt="${escHtml(p.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="avatar-initials battle-player-initials" style="display:none">${getInitials(p.name)}</div>`
+  const imgSrc = p.profileImageUrl
+    ? (p.profileImageUrl.startsWith('data:') ? p.profileImageUrl : convertImageUrl(p.profileImageUrl))
+    : ''
+  const avatarHtml = imgSrc
+    ? `<img class="battle-player-avatar" src="${escHtml(imgSrc)}" alt="${escHtml(p.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="avatar-initials battle-player-initials" style="display:none">${getInitials(p.name)}</div>`
     : `<div class="avatar-initials battle-player-initials">${getInitials(p.name)}</div>`
 
   const crownHtml = isWinner ? `<div class="winner-crown">👑</div>` : ''

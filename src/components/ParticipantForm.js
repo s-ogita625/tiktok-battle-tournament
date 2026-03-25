@@ -295,11 +295,17 @@ export function renderParticipantForm(container, editingId = null) {
           </div>
 
           <div class="form-group">
-            <label class="form-label">プロフィール画像URL</label>
-            <input class="form-input" id="f-img" type="text" placeholder="https://... またはGoogleドライブ共有リンク" value="${escHtml(formData.profileImageUrl)}" />
-            <span class="form-hint">TikTokのURLまたはGoogleドライブの共有リンクを貼り付けてください</span>
+            <label class="form-label">プロフィール画像</label>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+              <button type="button" class="btn btn-secondary btn-sm" id="upload-img-btn" style="white-space:nowrap">📁 画像をアップロード</button>
+              <span style="font-size:0.75rem;color:var(--color-text-muted)">または↓にURLを貼り付け</span>
+            </div>
+            <input type="file" id="f-img-file" accept="image/*" style="display:none" />
+            <input class="form-input" id="f-img" type="text" placeholder="https://... (画像の直リンクURL)" value="${escHtml(formData.profileImageUrl && !formData.profileImageUrl.startsWith('data:') ? formData.profileImageUrl : '')}" />
+            <span class="form-hint">JPG・PNG・GIF対応。ファイルアップロード推奨（URLはCORS制限で表示されない場合があります）</span>
             <div id="img-preview-wrap" style="margin-top:8px;display:flex;align-items:center;gap:10px">
-              ${formData.profileImageUrl ? `<img id="img-preview" src="${escHtml(convertImageUrl(formData.profileImageUrl))}" style="width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid var(--color-border)" onerror="this.style.display='none'" alt="プレビュー" />` : ''}
+              ${formData.profileImageUrl ? `<img id="img-preview" src="${escHtml(formData.profileImageUrl.startsWith('data:') ? formData.profileImageUrl : convertImageUrl(formData.profileImageUrl))}" style="width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid var(--color-border)" onerror="this.style.display='none'" alt="プレビュー" />` : ''}
+              ${formData.profileImageUrl ? `<span id="img-status" style="font-size:0.75rem;color:var(--color-text-muted)">${formData.profileImageUrl.startsWith('data:') ? '✅ アップロード済み' : 'URL設定済み'}</span>` : '<span id="img-status" style="font-size:0.75rem;color:var(--color-text-muted)">未設定</span>'}
             </div>
           </div>
 
@@ -340,29 +346,70 @@ export function renderParticipantForm(container, editingId = null) {
     renderPreview('availableDates', 'unavailableDates', 'preview-group')
     renderPreview('tournamentAvailableDates', 'tournamentUnavailableDates', 'preview-tournament')
 
+    // 画像アップロードボタン → hidden file input をトリガー
+    container.querySelector('#upload-img-btn')?.addEventListener('click', () => {
+      container.querySelector('#f-img-file')?.click()
+    })
+
+    // ファイル選択 → Base64変換してプレビュー＆formDataに保存
+    container.querySelector('#f-img-file')?.addEventListener('change', (e) => {
+      const file = e.target.files?.[0]
+      if (!file) return
+      if (file.size > 2 * 1024 * 1024) {
+        showToast('画像は2MB以下にしてください', 'error')
+        return
+      }
+      const reader = new FileReader()
+      reader.onload = (ev) => {
+        const base64 = ev.target.result
+        formData.profileImageUrl = base64
+        // URLフィールドをクリア（アップロード優先）
+        const urlInput = container.querySelector('#f-img')
+        if (urlInput) urlInput.value = ''
+        // プレビュー更新
+        updateImgPreview(base64, `✅ ${file.name}`)
+        showToast('画像をアップロードしました', 'success')
+      }
+      reader.readAsDataURL(file)
+    })
+
     // 画像URLのリアルタイムプレビュー
     container.querySelector('#f-img')?.addEventListener('input', (e) => {
-      const wrap = container.querySelector('#img-preview-wrap')
-      if (!wrap) return
       const raw = e.target.value.trim()
       const src = convertImageUrl(raw)
       if (src) {
-        let img = wrap.querySelector('#img-preview')
+        formData.profileImageUrl = src
+        updateImgPreview(src, 'URL設定済み')
+      } else {
+        // URLが空になったらBase64も持ってなければ未設定
+        if (!formData.profileImageUrl?.startsWith('data:')) {
+          formData.profileImageUrl = ''
+        }
+        updateImgPreview('', '未設定')
+      }
+    })
+
+    function updateImgPreview(src, statusText) {
+      const wrap = container.querySelector('#img-preview-wrap')
+      if (!wrap) return
+      let img = wrap.querySelector('#img-preview')
+      let statusEl = wrap.querySelector('#img-status')
+      if (src) {
         if (!img) {
           img = document.createElement('img')
           img.id = 'img-preview'
           img.style.cssText = 'width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid var(--color-border)'
           img.alt = 'プレビュー'
           img.onerror = () => { img.style.display = 'none' }
-          wrap.appendChild(img)
+          wrap.insertBefore(img, wrap.firstChild)
         }
         img.style.display = ''
         img.src = src
       } else {
-        const img = wrap.querySelector('#img-preview')
         if (img) img.style.display = 'none'
       }
-    })
+      if (statusEl) statusEl.textContent = statusText
+    }
 
     // フォーム送信
     const form = container.querySelector('#participant-form')
@@ -373,10 +420,15 @@ export function renderParticipantForm(container, editingId = null) {
       const salesVal = Number(container.querySelector('#f-sales').value)
       if (!nameVal || isNaN(salesVal)) return
 
-      formData.name             = nameVal
-      formData.sales            = salesVal
-      formData.tiktokUrl        = container.querySelector('#f-tiktok').value.trim()
-      formData.profileImageUrl  = convertImageUrl(container.querySelector('#f-img').value.trim())
+      formData.name      = nameVal
+      formData.sales     = salesVal
+      formData.tiktokUrl = container.querySelector('#f-tiktok').value.trim()
+      // Base64アップロード済みの場合はformDataのまま使用。URLが入力されている場合は変換する
+      const urlInputVal = container.querySelector('#f-img').value.trim()
+      if (urlInputVal) {
+        formData.profileImageUrl = convertImageUrl(urlInputVal)
+      }
+      // formData.profileImageUrl はファイルアップロード時にすでにBase64がセットされている
 
       if (editing) {
         store.updateTournament(ct => ({
