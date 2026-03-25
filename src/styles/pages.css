@@ -1714,7 +1714,7 @@
   flex-shrink: 0;
 }
 .viewer-chip-avatar-init {
-  display: flex !important;
+  display: none;
   align-items: center;
   justify-content: center;
   font-size: 0.85rem;
@@ -1787,7 +1787,7 @@
   display: block;
 }
 .viewer-battle-avatar-init {
-  display: flex !important;
+  display: none;
   align-items: center;
   justify-content: center;
   font-size: 0.9rem;
