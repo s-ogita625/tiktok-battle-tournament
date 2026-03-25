@@ -259,6 +259,20 @@
   color: var(--color-warning);
 }
 
+.btn-edit-schedule {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 0.8rem;
+  opacity: 0.55;
+  line-height: 1;
+  transition: opacity 0.15s;
+}
+.btn-edit-schedule:hover {
+  opacity: 1;
+}
+
 .battle-card-players {
   display: flex;
   align-items: center;

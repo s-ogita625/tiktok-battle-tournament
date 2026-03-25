@@ -114,12 +114,23 @@ function renderBracketMatchBox(match, rIdx, mIdx, totalRounds, participants) {
   // ラウンドが進むほど縦の間隔が広がる
   const spacingMultiplier = Math.pow(2, rIdx)
 
+  const dateStr = match.scheduledDate
+    ? `📅 ${match.scheduledDate} ${match.scheduledTime || ''}`
+    : ''
+  const scheduleArea = (p1 && p2 && !isBye)
+    ? `<div class="bracket-match-schedule" style="font-size:0.7rem;color:var(--color-text-dim);padding:2px 6px;display:flex;align-items:center;gap:4px">
+        ${dateStr || '<span style="opacity:0.6">日程未定</span>'}
+        <button class="btn-edit-schedule bracket-sched-btn" data-match-id="${match.id}" data-date="${match.scheduledDate || ''}" data-time="${match.scheduledTime || ''}" title="日時を編集" style="background:none;border:none;cursor:pointer;padding:0;font-size:0.8rem;opacity:0.7">✏️</button>
+       </div>`
+    : ''
+
   return `
     <div class="bracket-match-wrap" style="--spacing:${spacingMultiplier}">
       <div class="bracket-match-box ${isDone ? 'is-done' : ''} ${isBye ? 'is-bye' : ''} ${isFinal ? 'is-final' : ''}"
            data-match-id="${match.id}"
            ${!result && p1 && p2 ? `data-clickable="true"` : ''}>
 
+        ${scheduleArea}
         ${renderBracketPlayer(p1, match.player1Id, winnerId, result?.score1, isBye, 1)}
         <div class="bracket-match-sep"></div>
         ${renderBracketPlayer(p2, match.player2Id, winnerId, result?.score2, isBye, 2)}
@@ -182,6 +193,7 @@ function attachBracketEvents(container, rounds, participants, totalRounds) {
   container.querySelectorAll('[data-clickable="true"]').forEach(box => {
     box.addEventListener('click', (e) => {
       if (e.target.closest('.bracket-edit-btn')) return
+      if (e.target.closest('.bracket-sched-btn')) return
       openScoreModal(container, box.dataset.matchId, rounds, participants)
     })
   })
@@ -197,6 +209,29 @@ function attachBracketEvents(container, rounds, participants, totalRounds) {
     })
   })
 
+  // 日程編集ボタン（トーナメント）
+  container.querySelectorAll('.bracket-sched-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      const matchId = btn.dataset.matchId
+      openTournamentScheduleModal(btn.dataset.date, btn.dataset.time, (newDate, newTime) => {
+        store.updateTournament(ct => {
+          const nb = JSON.parse(JSON.stringify(ct.tournamentBracket))
+          for (const round of nb.rounds) {
+            const match = round.find(m => m.id === matchId)
+            if (match) {
+              match.scheduledDate = newDate || null
+              match.scheduledTime = newTime
+              break
+            }
+          }
+          return { tournamentBracket: nb }
+        })
+        showToast('日時を更新しました', 'success')
+      })
+    })
+  })
+
   // モーダル閉じる
   container.querySelector('#score-modal-close')?.addEventListener('click', () => {
     container.querySelector('#score-modal').style.display = 'none'
@@ -205,6 +240,50 @@ function attachBracketEvents(container, rounds, participants, totalRounds) {
     if (e.target === e.currentTarget) {
       e.currentTarget.style.display = 'none'
     }
+  })
+}
+
+function openTournamentScheduleModal(currentDate, currentTime, onSave) {
+  const existing = document.getElementById('tournament-schedule-modal')
+  if (existing) existing.remove()
+
+  const modal = document.createElement('div')
+  modal.id = 'tournament-schedule-modal'
+  modal.style.cssText = 'display:flex;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.6);align-items:center;justify-content:center'
+  modal.innerHTML = `
+    <div class="modal" style="min-width:300px;max-width:380px;width:90%">
+      <div class="modal-header">
+        <h2 class="modal-title">日時を編集</h2>
+        <button class="modal-close" id="tsched-close">✕</button>
+      </div>
+      <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+        <div>
+          <label class="form-label">日付</label>
+          <input class="form-input" id="tsched-date" type="date" value="${currentDate || ''}" />
+        </div>
+        <div>
+          <label class="form-label">時刻</label>
+          <input class="form-input" id="tsched-time" type="time" value="${currentTime || ''}" />
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
+          <button class="btn btn-secondary" id="tsched-cancel">キャンセル</button>
+          <button class="btn btn-primary" id="tsched-save">✅ 保存</button>
+        </div>
+      </div>
+    </div>
+  `
+  document.body.appendChild(modal)
+
+  const close = () => modal.remove()
+  modal.querySelector('#tsched-close').addEventListener('click', close)
+  modal.querySelector('#tsched-cancel').addEventListener('click', close)
+  modal.addEventListener('click', (e) => { if (e.target === modal) close() })
+
+  modal.querySelector('#tsched-save').addEventListener('click', () => {
+    const newDate = modal.querySelector('#tsched-date').value
+    const newTime = modal.querySelector('#tsched-time').value
+    onSave(newDate, newTime)
+    close()
   })
 }
 

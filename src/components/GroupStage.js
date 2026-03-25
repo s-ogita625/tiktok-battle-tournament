@@ -215,6 +215,71 @@ function attachGroupEvents(container, groups, participants) {
       })
     })
   })
+
+  container.querySelectorAll('.btn-edit-schedule').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      const battleId = btn.dataset.battleId
+      openScheduleEditModal(btn.dataset.date, btn.dataset.time, (newDate, newTime) => {
+        store.updateTournament(ct => {
+          const newGroups = ct.groups.map(g => {
+            const battleIdx = g.battles.findIndex(b => b.id === battleId)
+            if (battleIdx === -1) return g
+            const newBattles = [...g.battles]
+            newBattles[battleIdx] = { ...newBattles[battleIdx], scheduledDate: newDate || null, scheduledTime: newTime }
+            return { ...g, battles: newBattles }
+          })
+          return { groups: newGroups }
+        })
+        showToast('日時を更新しました', 'success')
+      })
+    })
+  })
+}
+
+function openScheduleEditModal(currentDate, currentTime, onSave) {
+  const existing = document.getElementById('schedule-edit-modal')
+  if (existing) existing.remove()
+
+  const modal = document.createElement('div')
+  modal.id = 'schedule-edit-modal'
+  modal.className = 'modal-overlay'
+  modal.style.cssText = 'display:flex;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.6);align-items:center;justify-content:center'
+  modal.innerHTML = `
+    <div class="modal" style="min-width:300px;max-width:380px;width:90%">
+      <div class="modal-header">
+        <h2 class="modal-title">日時を編集</h2>
+        <button class="modal-close" id="sched-modal-close">✕</button>
+      </div>
+      <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+        <div>
+          <label class="form-label">日付</label>
+          <input class="form-input" id="sched-date-input" type="date" value="${currentDate || ''}" />
+        </div>
+        <div>
+          <label class="form-label">時刻</label>
+          <input class="form-input" id="sched-time-input" type="time" value="${currentTime || ''}" />
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
+          <button class="btn btn-secondary" id="sched-cancel">キャンセル</button>
+          <button class="btn btn-primary" id="sched-save">✅ 保存</button>
+        </div>
+      </div>
+    </div>
+  `
+  document.body.appendChild(modal)
+
+  const close = () => modal.remove()
+  modal.querySelector('#sched-modal-close').addEventListener('click', close)
+  modal.querySelector('#sched-cancel').addEventListener('click', close)
+  modal.addEventListener('click', (e) => { if (e.target === modal) close() })
+
+  modal.querySelector('#sched-save').addEventListener('click', () => {
+    const newDate = modal.querySelector('#sched-date-input').value
+    const newTime = modal.querySelector('#sched-time-input').value
+    onSave(newDate, newTime)
+    close()
+  })
 }
 
 function showToast(message, type = 'info') {

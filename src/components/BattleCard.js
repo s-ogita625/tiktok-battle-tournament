@@ -21,9 +21,13 @@ export function renderBattleCard(battle, p1, p2, editable = true) {
     ? `📅 ${formatDate(battle.scheduledDate)} ${battle.scheduledTime || ''}`
     : `<span class="no-date">⚠️ 日程未定</span>`
 
+  const editDateBtn = editable
+    ? `<button class="btn-edit-schedule" data-battle-id="${battle.id}" data-date="${battle.scheduledDate || ''}" data-time="${battle.scheduledTime || ''}" title="日時を編集">✏️</button>`
+    : ''
+
   return `
     <div class="battle-card ${result ? 'completed' : ''}" data-battle-id="${battle.id}">
-      <div class="battle-card-date">${dateStr}</div>
+      <div class="battle-card-date" style="display:flex;align-items:center;gap:6px">${dateStr}${editDateBtn}</div>
       <div class="battle-card-players">
         <div class="battle-player">
           ${renderPlayerLink(p1, p1IsWinner, 'left')}
