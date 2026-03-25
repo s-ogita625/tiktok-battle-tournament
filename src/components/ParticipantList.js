@@ -17,7 +17,11 @@ export function renderParticipantList(container, formContainer) {
           <p class="participant-count">${participants.length} 名登録済み</p>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          ${hasGroups ? '' : `
+          ${hasGroups ? `
+            <button id="reassign-btn" class="btn btn-secondary btn-sm">
+              🔄 グループを振り直す
+            </button>
+          ` : `
             <button id="auto-assign-btn" class="btn btn-teal btn-sm" ${participants.length < 2 ? 'disabled' : ''}>
               ⚡ グループ割り振りを実行
             </button>
@@ -40,6 +44,11 @@ export function renderParticipantList(container, formContainer) {
 
     container.querySelector('#auto-assign-btn')?.addEventListener('click', () => {
       container.dispatchEvent(new CustomEvent('assign-groups'))
+    })
+
+    container.querySelector('#reassign-btn')?.addEventListener('click', () => {
+      if (!confirm('グループを振り直しますか？\n現在のグループ分けと全ての対戦結果・トーナメントブラケットがリセットされます。')) return
+      container.dispatchEvent(new CustomEvent('reset-and-reassign'))
     })
 
     container.querySelectorAll('[data-edit]').forEach(btn => {

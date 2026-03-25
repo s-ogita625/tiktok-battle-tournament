@@ -141,6 +141,20 @@ function initApp() {
       renderPage('groups')
       showToast(`${groups.length}グループに割り振りました！`, 'success')
     })
+
+    listArea.addEventListener('reset-and-reassign', () => {
+      const ct = store.getState().currentTournament
+      if (!ct || ct.participants.length < 2) return
+
+      // グループ・ブラケット・ステージをリセットしてから再割り振り
+      store.updateTournament({ groups: [], tournamentBracket: null, stage: 'participants' })
+
+      const ct2 = store.getState().currentTournament
+      const groups = assignGroups(ct2.participants, ct2.settings)
+      store.updateTournament({ groups, stage: 'groups' })
+      renderPage('groups')
+      showToast(`グループを振り直しました！（${groups.length}グループ）`, 'success')
+    })
   }
 }
 
