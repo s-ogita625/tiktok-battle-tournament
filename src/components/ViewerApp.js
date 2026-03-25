@@ -15,6 +15,66 @@ const LOCAL_STORAGE_KEY   = 'tbt_state'
 const GIST_ID_STORAGE_KEY = 'tbt_gist_id'
 const GIST_OWNER          = 's-ogita625'
 
+/**
+ * Gist RAW URL（img-{id}.b64）に保存された data:URL テキストを fetch して返す。
+ * キャッシュ付き（同一URL は一度だけ fetch）。
+ * Gist RAW URL でない場合は convertImageUrl() の結果をそのまま返す。
+ */
+const _gistImageCache = {} // url → data:URL or ''
+
+async function resolveImageUrl(rawProfileImageUrl) {
+  const url = convertImageUrl(rawProfileImageUrl || '')
+  if (!url) return ''
+  // Gist RAW URL（.b64 ファイル）の場合、fetch してdata:URLとして取得
+  if (url.includes('gist.githubusercontent.com') && url.includes('.b64')) {
+    if (_gistImageCache[url] !== undefined) return _gistImageCache[url]
+    try {
+      const res = await fetch(url)
+      if (res.ok) {
+        const text = (await res.text()).trim()
+        // data: プレフィックスがある場合はそのまま、ない場合は付与
+        const dataUrl = text.startsWith('data:') ? text : `data:image/jpeg;base64,${text}`
+        _gistImageCache[url] = dataUrl
+        return dataUrl
+      }
+    } catch { /* 無視 */ }
+    _gistImageCache[url] = ''
+    return ''
+  }
+  return url
+}
+
+/**
+ * 大会内の全参加者の Gist 画像を事前に並列 fetch してキャッシュに積む
+ */
+async function prefetchGistImages(tournaments) {
+  const tasks = []
+  for (const t of tournaments) {
+    for (const p of (t.participants || [])) {
+      const url = convertImageUrl(p.profileImageUrl || '')
+      if (url && url.includes('gist.githubusercontent.com') && url.includes('.b64')) {
+        if (_gistImageCache[url] === undefined) {
+          tasks.push(resolveImageUrl(p.profileImageUrl))
+        }
+      }
+    }
+  }
+  if (tasks.length > 0) await Promise.all(tasks)
+}
+
+/**
+ * キャッシュ済みのデータ:URLを同期的に返す（prefetchGistImages後に使用）
+ * Gist RAW URL の場合はキャッシュから取り出し、それ以外は convertImageUrl を通す
+ */
+function getCachedImageUrl(rawProfileImageUrl) {
+  const url = convertImageUrl(rawProfileImageUrl || '')
+  if (!url) return ''
+  if (url.includes('gist.githubusercontent.com') && url.includes('.b64')) {
+    return _gistImageCache[url] || ''
+  }
+  return url
+}
+
 /** localStorage から公開中の大会を取得する（フォールバック用） */
 function getLocalPublicTournaments() {
   try {
@@ -104,6 +164,9 @@ export async function renderViewerApp(container) {
     `
     return
   }
+
+  // Gist RAW URL の画像を並列 fetch してキャッシュに積む（表示前に解決）
+  await prefetchGistImages(allTournaments)
 
   container.innerHTML = `
     <div class="viewer-layout">
@@ -300,7 +363,7 @@ function renderParticipantsView(participants) {
   return `
     <div class="viewer-participants-grid">
       ${sorted.map((p) => {
-        const imgSrc = convertImageUrl(p.profileImageUrl || '')
+        const imgSrc = getCachedImageUrl(p.profileImageUrl || '')
         const avatarHtml = imgSrc
           ? `<img class="viewer-avatar" src="${escHtml(imgSrc)}" alt="${escHtml(p.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="avatar-initials viewer-avatar-init" style="display:none">${p.name.slice(0,2)}</div>`
           : `<div class="avatar-initials viewer-avatar-init">${p.name.slice(0,2)}</div>`
@@ -343,7 +406,7 @@ function renderGroupsView(groups, participants) {
       <!-- ドロップダウン：ライバーカード一覧 -->
       <div class="viewer-filter-dropdown" id="group-filter-dropdown" style="display:none">
         ${participants.map(p => {
-          const imgSrc = convertImageUrl(p.profileImageUrl || '')
+          const imgSrc = getCachedImageUrl(p.profileImageUrl || '')
           const avatarHtml = imgSrc
             ? `<img class="viewer-chip-avatar" src="${escHtml(imgSrc)}" alt="${escHtml(p.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="avatar-initials viewer-chip-avatar-init" style="display:none">${p.name.slice(0,2)}</div>`
             : `<div class="avatar-initials viewer-chip-avatar-init">${p.name.slice(0,2)}</div>`
@@ -394,7 +457,7 @@ function renderGroupCard(group, participants) {
                       <td>
                         <div style="display:flex;align-items:center;gap:6px">
                           ${p?.profileImageUrl
-                            ? `<img src="${escHtml(convertImageUrl(p.profileImageUrl))}" style="width:22px;height:22px;border-radius:50%;object-fit:cover" onerror="this.style.display='none'" alt="" />`
+                            ? `<img src="${escHtml(getCachedImageUrl(p.profileImageUrl))}" style="width:22px;height:22px;border-radius:50%;object-fit:cover" onerror="this.style.display='none'" alt="" />`
                             : `<div class="avatar-initials" style="width:22px;height:22px;font-size:0.55rem">${(p?.name||'?').slice(0,2)}</div>`}
                           <span>${escHtml(p?.name || '不明')}</span>
                           ${showAdv ? `<span style="color:var(--color-secondary);font-size:0.7rem">↑進出</span>` : ''}
@@ -435,7 +498,7 @@ function renderGroupCard(group, participants) {
           const w = battle.result?.winnerId
 
           const renderBattlePlayer = (p, isWinner, isLoser) => {
-            const imgSrc = convertImageUrl(p.profileImageUrl || '')
+            const imgSrc = getCachedImageUrl(p.profileImageUrl || '')
             const avatarHtml = imgSrc
               ? `<img class="viewer-battle-avatar" src="${escHtml(imgSrc)}" alt="${escHtml(p.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="avatar-initials viewer-battle-avatar-init" style="display:none">${p.name.slice(0,2)}</div>`
               : `<div class="avatar-initials viewer-battle-avatar-init">${p.name.slice(0,2)}</div>`
@@ -503,7 +566,7 @@ function renderBracketView(bracket, participants) {
 function renderViewerWinnerBanner(winnerId, participants) {
   const p = participants.find(x => x.id === winnerId)
   if (!p) return ''
-  const imgSrc = convertImageUrl(p.profileImageUrl || '')
+  const imgSrc = getCachedImageUrl(p.profileImageUrl || '')
   const avatarHtml = imgSrc
     ? `<img src="${escHtml(imgSrc)}" class="tnmt-winner-avatar" alt="${escHtml(p.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="avatar-initials tnmt-winner-initials" style="display:none">${p.name.slice(0,2)}</div>`
     : `<div class="avatar-initials tnmt-winner-initials">${p.name.slice(0,2)}</div>`
@@ -570,7 +633,7 @@ function renderViewerPlayer(p, playerId, winnerId, score, isBye) {
 
   const isWinner = winnerId === playerId
   const isLoser  = winnerId && winnerId !== playerId && !isBye
-  const imgSrc   = convertImageUrl(p.profileImageUrl || '')
+  const imgSrc   = getCachedImageUrl(p.profileImageUrl || '')
 
   const avatarHtml = imgSrc
     ? `<img src="${escHtml(imgSrc)}" class="bracket-player-avatar" alt="${escHtml(p.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="avatar-initials bracket-player-avatar-init" style="display:none">${p.name.slice(0,2)}</div>`

@@ -55,13 +55,15 @@ export default async function handler(req, res) {
     return res.status(400).json({ ok: false, message: 'base64 が必要です' })
   }
 
-  // data:image/jpeg;base64,XXXX... から純粋な Base64 部分を抽出
-  // ファイル内容として Gist に保存する（MIME タイプはファイル名で管理）
-  const base64Data = base64.includes(',') ? base64.split(',')[1] : base64
-
-  if (!base64Data) {
+  // data:image/jpeg;base64,XXXX... 形式をそのままGistに保存する
+  // ※ プレフィックスを含む完全なdata:URLとして保存することで、
+  //    閲覧ページがRAW URLをfetchした際にそのままimg srcに使える
+  if (!base64) {
     return res.status(400).json({ ok: false, message: 'Base64 データが空です' })
   }
+
+  // data: プレフィックスがない場合（旧形式対応）は付与する
+  const base64Data = base64.startsWith('data:') ? base64 : `data:image/jpeg;base64,${base64}`
 
   const fileKey = `img-${participantId}.b64`
   const headers = {

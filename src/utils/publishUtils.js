@@ -91,25 +91,26 @@ export async function publishTournamentData(tournaments, onProgress) {
       })
     })
 
-    // 画像アップロード（並列）
+    // 画像アップロード（順次実行: gistId を正しく伝播させるため）
+    // ※ 並列実行すると、gistId が空の場合に全タスクが同時に空のgistIdで送られ
+    //    複数の別々のGistが作成されてしまうため、順次実行に変更
     const uploadedUrls = {} // key: participantId → rawUrl
     if (uploadTasks.length > 0) {
       onProgress?.(`⏳ 画像をアップロード中... (${uploadTasks.length}件)`)
 
-      const results = await Promise.all(
-        uploadTasks.map(task => uploadImageToGist(task.participantId, task.base64, currentGistId))
-      )
-
-      results.forEach((result, i) => {
+      for (let i = 0; i < uploadTasks.length; i++) {
+        const task = uploadTasks[i]
+        onProgress?.(`⏳ 画像をアップロード中... (${i + 1}/${uploadTasks.length}件)`)
+        const result = await uploadImageToGist(task.participantId, task.base64, currentGistId)
         if (result.ok && result.rawUrl) {
-          uploadedUrls[uploadTasks[i].participantId] = result.rawUrl
-          // アップロード中に Gist が新規作成された場合、そのIDを使用
+          uploadedUrls[task.participantId] = result.rawUrl
+          // アップロード中に Gist が新規作成された場合、そのIDを以降のアップロードでも使用
           if (!currentGistId && result.gistId) {
             currentGistId = result.gistId
             saveGistId(currentGistId)
           }
         }
-      })
+      }
     }
 
     // -----------------------------------------------------------------
