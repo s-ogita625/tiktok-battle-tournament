@@ -265,56 +265,92 @@ function renderTournamentDetail(container, t) {
   })
 
   // ──────────────────────────────────────────────────────
-  //  グループタブ：ライバー絞り込みフィルター（ドロップダウン方式）
+  //  グループタブ：絞り込みフィルター（ライバー・対戦日）
   // ──────────────────────────────────────────────────────
   const filterToggleBtn  = container.querySelector('#group-filter-toggle-btn')
   const filterDropdown   = container.querySelector('#group-filter-dropdown')
   const filterClearBtn   = container.querySelector('#group-filter-clear-btn')
   const filterStatus     = container.querySelector('#group-filter-status')
+  const dateToggleBtn    = container.querySelector('#date-filter-toggle-btn')
+  const dateDropdown     = container.querySelector('#date-filter-dropdown')
+  const dateClearBtn     = container.querySelector('#date-filter-clear-btn')
+  const dateStatus       = container.querySelector('#date-filter-status')
 
   if (filterToggleBtn && filterDropdown) {
     let activeFilter = ''
+    let activeDateFilter = ''
 
-    /** フィルターを適用して対戦カードを絞り込む */
-    function applyFilter(name) {
-      activeFilter = name
+    /** 両フィルター（AND条件）を適用して対戦カードを絞り込む */
+    function applyFilters() {
       const allCards = container.querySelectorAll('.viewer-battle-card')
-
-      if (!name) {
-        allCards.forEach(card => card.style.display = '')
-        container.querySelectorAll('.viewer-group-card').forEach(gc => gc.style.display = '')
-        filterStatus.style.display = 'none'
-        filterStatus.textContent = ''
-        filterClearBtn.style.display = 'none'
-        filterToggleBtn.classList.remove('is-active')
-        filterToggleBtn.textContent = '🔍 ライバーで絞り込み'
-        return
-      }
-
       let matchCount = 0
       allCards.forEach(card => {
-        const hit = card.dataset.p1 === name || card.dataset.p2 === name
+        const nameHit = !activeFilter || card.dataset.p1 === activeFilter || card.dataset.p2 === activeFilter
+        const dateHit = !activeDateFilter
+          || (activeDateFilter === '__unscheduled__'
+            ? card.dataset.date === ''
+            : card.dataset.date === activeDateFilter)
+        const hit = nameHit && dateHit
         card.style.display = hit ? '' : 'none'
         if (hit) matchCount++
       })
-
       // 対戦が1件もないグループカードを非表示
       container.querySelectorAll('.viewer-group-card').forEach(gc => {
         const visible = [...gc.querySelectorAll('.viewer-battle-card')].some(c => c.style.display !== 'none')
         gc.style.display = visible ? '' : 'none'
       })
-
-      filterStatus.style.display = ''
-      filterStatus.textContent = `「${name}」の対戦：${matchCount}件`
-      filterClearBtn.style.display = ''
-      filterToggleBtn.classList.add('is-active')
-      filterToggleBtn.textContent = `🔍 ${name}`
+      return matchCount
     }
 
-    // 絞り込みボタンクリック → ドロップダウン開閉
+    /** ライバーフィルターを適用 */
+    function applyFilter(name) {
+      activeFilter = name
+      if (!name) {
+        filterStatus.style.display = 'none'
+        filterStatus.textContent = ''
+        filterClearBtn.style.display = 'none'
+        filterToggleBtn.classList.remove('is-active')
+        filterToggleBtn.textContent = '🔍 ライバーで絞り込み'
+      } else {
+        filterToggleBtn.classList.add('is-active')
+        filterToggleBtn.textContent = `🔍 ${name}`
+        filterClearBtn.style.display = ''
+      }
+      const matchCount = applyFilters()
+      if (name) {
+        filterStatus.style.display = ''
+        filterStatus.textContent = `「${name}」の対戦：${matchCount}件`
+      }
+    }
+
+    /** 対戦日フィルターを適用 */
+    function applyDateFilter(date) {
+      activeDateFilter = date
+      if (!date) {
+        dateStatus.style.display = 'none'
+        dateStatus.textContent = ''
+        dateClearBtn.style.display = 'none'
+        dateToggleBtn.classList.remove('is-active')
+        dateToggleBtn.textContent = '📅 対戦日で絞り込み'
+      } else {
+        const label = date === '__unscheduled__' ? '日程未定' : formatDate(date)
+        dateToggleBtn.classList.add('is-active')
+        dateToggleBtn.textContent = `📅 ${label}`
+        dateClearBtn.style.display = ''
+      }
+      const matchCount = applyFilters()
+      if (date) {
+        const label = date === '__unscheduled__' ? '日程未定' : formatDate(date)
+        dateStatus.style.display = ''
+        dateStatus.textContent = `「${label}」の対戦：${matchCount}件`
+      }
+    }
+
+    // ライバーフィルターボタン → ドロップダウン開閉
     filterToggleBtn.addEventListener('click', () => {
       const isOpen = filterDropdown.style.display !== 'none'
       filterDropdown.style.display = isOpen ? 'none' : ''
+      dateDropdown.style.display = 'none' // 対戦日側を閉じる
     })
 
     // ドロップダウン内のライバー選択
@@ -322,18 +358,43 @@ function renderTournamentDetail(container, t) {
       item.addEventListener('click', () => {
         const name = item.dataset.name || ''
         filterDropdown.style.display = 'none'
-        // ドロップダウン内のアクティブ状態を更新
         filterDropdown.querySelectorAll('.viewer-filter-dropdown-item').forEach(i => i.classList.remove('active'))
         item.classList.add('active')
         applyFilter(name)
       })
     })
 
-    // クリアボタン
+    // ライバークリアボタン
     filterClearBtn.addEventListener('click', () => {
       filterDropdown.querySelectorAll('.viewer-filter-dropdown-item').forEach(i => i.classList.remove('active'))
       applyFilter('')
     })
+
+    // 対戦日フィルターボタン → ドロップダウン開閉
+    if (dateToggleBtn && dateDropdown) {
+      dateToggleBtn.addEventListener('click', () => {
+        const isOpen = dateDropdown.style.display !== 'none'
+        dateDropdown.style.display = isOpen ? 'none' : ''
+        filterDropdown.style.display = 'none' // ライバー側を閉じる
+      })
+
+      // ドロップダウン内の対戦日選択
+      dateDropdown.querySelectorAll('.viewer-filter-dropdown-item--date').forEach(item => {
+        item.addEventListener('click', () => {
+          const date = item.dataset.date || ''
+          dateDropdown.style.display = 'none'
+          dateDropdown.querySelectorAll('.viewer-filter-dropdown-item--date').forEach(i => i.classList.remove('active'))
+          item.classList.add('active')
+          applyDateFilter(date)
+        })
+      })
+
+      // 対戦日クリアボタン
+      dateClearBtn.addEventListener('click', () => {
+        dateDropdown.querySelectorAll('.viewer-filter-dropdown-item--date').forEach(i => i.classList.remove('active'))
+        applyDateFilter('')
+      })
+    }
 
     // ドロップダウン外クリックで閉じる
     document.addEventListener('click', e => {
@@ -343,6 +404,13 @@ function renderTournamentDetail(container, t) {
         !filterClearBtn.contains(e.target)
       ) {
         filterDropdown.style.display = 'none'
+      }
+      if (dateToggleBtn && dateDropdown &&
+        !dateToggleBtn.contains(e.target) &&
+        !dateDropdown.contains(e.target) &&
+        !dateClearBtn?.contains(e.target)
+      ) {
+        dateDropdown.style.display = 'none'
       }
     })
   }
@@ -393,6 +461,12 @@ function renderGroupsView(groups, participants) {
     return `<div class="viewer-empty-section">グループ情報がありません</div>`
   }
 
+  // 対戦日フィルター用: 全グループから日付を抽出してソート
+  const uniqueDates = [...new Set(
+    groups.flatMap(g => (g.battles || []).map(b => b.scheduledDate).filter(d => !!d))
+  )].sort()
+  const hasUnscheduled = groups.some(g => (g.battles || []).some(b => !b.scheduledDate))
+
   return `
     <div class="viewer-groups-filter-bar">
       <div class="viewer-filter-top-row">
@@ -400,7 +474,13 @@ function renderGroupsView(groups, participants) {
           🔍 ライバーで絞り込み
         </button>
         <button class="viewer-filter-clear-btn" id="group-filter-clear-btn" style="display:none">
-          ✕ クリア
+          ✕
+        </button>
+        <button class="viewer-filter-toggle-btn" id="date-filter-toggle-btn">
+          📅 対戦日で絞り込み
+        </button>
+        <button class="viewer-filter-clear-btn" id="date-filter-clear-btn" style="display:none">
+          ✕
         </button>
       </div>
       <!-- ドロップダウン：ライバーカード一覧 -->
@@ -418,7 +498,21 @@ function renderGroupsView(groups, participants) {
           `
         }).join('')}
       </div>
+      <!-- ドロップダウン：対戦日一覧 -->
+      <div class="viewer-filter-dropdown viewer-filter-dropdown--date" id="date-filter-dropdown" style="display:none">
+        ${uniqueDates.map(d => `
+          <button class="viewer-filter-dropdown-item viewer-filter-dropdown-item--date" data-date="${escHtml(d)}">
+            ${formatDate(d)}
+          </button>
+        `).join('')}
+        ${hasUnscheduled ? `
+          <button class="viewer-filter-dropdown-item viewer-filter-dropdown-item--date" data-date="__unscheduled__">
+            日程未定
+          </button>
+        ` : ''}
+      </div>
       <div id="group-filter-status" class="viewer-filter-status" style="display:none"></div>
+      <div id="date-filter-status" class="viewer-filter-status" style="display:none"></div>
     </div>
     <div class="viewer-groups-grid" id="viewer-groups-grid">
       ${groups.map(group => renderGroupCard(group, participants)).join('')}
@@ -516,7 +610,8 @@ function renderGroupCard(group, participants) {
 
           return `
             <div class="viewer-battle-card ${isDone ? 'is-done' : ''}"
-                 data-p1="${escHtml(p1.name)}" data-p2="${escHtml(p2.name)}">
+                 data-p1="${escHtml(p1.name)}" data-p2="${escHtml(p2.name)}"
+                 data-date="${escHtml(battle.scheduledDate || '')}">
               <div class="viewer-battle-date">
                 ${battle.scheduledDate ? formatDate(battle.scheduledDate) : '日程未定'}
                 ${battle.scheduledTime ? battle.scheduledTime + '〜' : ''}
