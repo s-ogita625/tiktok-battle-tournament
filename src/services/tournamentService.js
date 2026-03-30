@@ -2,15 +2,69 @@ import { generateId } from '../utils/exportUtils.js'
 import { scheduleTournamentBattle } from './scheduleService.js'
 
 /**
+ * 同グループ選手が1回戦で当たらないようにスロットを調整する（ベストエフォート）
+ * 基本ペアリング slots[i] vs slots[N-1-i] に対して、同グループペアを検出したら
+ * 後半スロットの別グループ選手と入れ替える。
+ *
+ * @param {Array<string|null>} slots - 進出者IDの配列（null は BYE 枠）
+ * @param {{ [id: string]: string }} groupMap - { participantId: groupName }
+ * @returns {Array<string|null>} 調整後のスロット配列
+ */
+function separateGroupMates(slots, groupMap) {
+  if (!groupMap || Object.keys(groupMap).length === 0) return slots
+  const result = [...slots]
+  const N = result.length
+
+  for (let i = 0; i < N / 2; i++) {
+    const idA = result[i]
+    const idB = result[N - 1 - i]
+    if (idA === null || idB === null) continue
+
+    const groupA = groupMap[idA]
+    const groupB = groupMap[idB]
+    // 異なるグループ or グループ情報不明 → 問題なし
+    if (!groupA || !groupB || groupA !== groupB) continue
+
+    // 同グループペア検出 → 後半スロットから交換先を探す
+    for (let j = N / 2; j < N; j++) {
+      if (j === N - 1 - i) continue  // 現在の対戦相手はスキップ
+      const idC = result[j]
+      if (idC === null) continue
+      const groupC = groupMap[idC]
+      if (groupC && groupC === groupA) continue  // 交換先も同グループならスキップ
+
+      // 交換後に新たな同グループ問題が生じないか確認
+      // 交換後のペア: result[i](idA) vs result[j](idC) → groupA vs groupC (OK済み)
+      //              result[N-1-j](jMirrorI の上位シード) vs result[N-1-i](idB)
+      const jMirrorI = N - 1 - j
+      const idMirrorJ = result[jMirrorI]
+      const groupMirrorJ = idMirrorJ ? groupMap[idMirrorJ] : null
+      if (groupMirrorJ && groupMirrorJ === groupB) continue  // 新たな同グループ問題発生 → スキップ
+
+      // 交換実行: result[N-1-i](idB) ↔ result[j](idC)
+      result[N - 1 - i] = idC
+      result[j] = idB
+      break
+    }
+    // 交換先がなければベストエフォートでそのまま（全員同グループなど）
+  }
+  return result
+}
+
+/**
  * 決勝トーナメントのブラケットを生成する
- * @param {string[]} advancerIds - 進出者IDの配列（総合順位順）
+ * @param {string[]} advancerIds   - 進出者IDの配列（総合順位順）
  * @param {number}   tournamentSize - トーナメント規模（4/8/16）
  * @param {object[]} participants   - 参加者オブジェクト配列（日程情報取得用）
  * @param {object}   settings       - アプリ設定（defaultBattleTimes など）
+ * @param {object}   groupMap       - { participantId: groupName }（同グループ1回戦回避用）
  */
-export function generateTournamentBracket(advancerIds, tournamentSize, participants = [], settings = {}) {
+export function generateTournamentBracket(advancerIds, tournamentSize, participants = [], settings = {}, groupMap = {}) {
   const slots = [...advancerIds]
   while (slots.length < tournamentSize) slots.push(null)
+
+  // 同グループ選手が1回戦で当たらないようにスロットを調整（ベストエフォート）
+  const adjustedSlots = separateGroupMates(slots, groupMap)
 
   const numRounds = calcRounds(tournamentSize)
   const bracket = { rounds: [], winner: null }
@@ -19,9 +73,9 @@ export function generateTournamentBracket(advancerIds, tournamentSize, participa
   // 日程も同時に自動割り当て
   const firstRoundMatches = []
   const scheduledSoFar = []   // 同日重複回避用
-  for (let i = 0; i < slots.length / 2; i++) {
-    const p1Id = slots[i]
-    const p2Id = slots[slots.length - 1 - i]
+  for (let i = 0; i < adjustedSlots.length / 2; i++) {
+    const p1Id = adjustedSlots[i]
+    const p2Id = adjustedSlots[adjustedSlots.length - 1 - i]
     const p1 = participants.find(p => p.id === p1Id) || null
     const p2 = participants.find(p => p.id === p2Id) || null
 

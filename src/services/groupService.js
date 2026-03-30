@@ -199,6 +199,27 @@ export function getTournamentAdvancers(groups, participants = []) {
 }
 
 /**
+ * グループ情報から { participantId: groupName } のマップを生成する
+ * generateTournamentBracket に渡して同グループ対戦を回避するために使用
+ *
+ * @param {object[]} groups - グループ配列
+ * @param {object[]} participants - 参加者配列（辞退チェック用）
+ * @returns {{ [participantId: string]: string }}
+ */
+export function getGroupMap(groups, participants = []) {
+  const map = {}
+  const isWithdrawn = id => participants.find(x => x.id === id)?.withdrawn === true
+  for (const group of groups) {
+    for (const standing of (group.standings || [])) {
+      if (!isWithdrawn(standing.participantId)) {
+        map[standing.participantId] = group.name
+      }
+    }
+  }
+  return map
+}
+
+/**
  * 参加者の辞退処理
  * 辞退者との未実施バトルを不戦勝（相手10万pt）で埋めて groups を返す。
  * standings の再計算は呼び出し側で行うこと。

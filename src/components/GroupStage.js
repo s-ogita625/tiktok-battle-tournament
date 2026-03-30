@@ -1,5 +1,5 @@
 import { store } from '../data/store.js'
-import { recalcStandings, getTournamentAdvancers, withdrawParticipant } from '../services/groupService.js'
+import { recalcStandings, getTournamentAdvancers, withdrawParticipant, getGroupMap } from '../services/groupService.js'
 import { generateTournamentBracket } from '../services/tournamentService.js'
 import { renderBattleCard } from './BattleCard.js'
 import { convertImageUrl } from './ParticipantList.js'
@@ -55,11 +55,13 @@ export function renderGroupStage(container) {
     container.querySelector('#advance-btn')?.addEventListener('click', () => {
       const ct2 = store.getState().currentTournament
       const advancers = getTournamentAdvancers(ct2.groups, ct2.participants)
+      const groupMap = getGroupMap(ct2.groups, ct2.participants)
       const bracket = generateTournamentBracket(
         advancers,
         ct2.settings.tournamentSize,
         ct2.participants,
-        ct2.settings
+        ct2.settings,
+        groupMap
       )
       store.updateTournament({ tournamentBracket: bracket, stage: 'tournament' })
       showToast(`${advancers.length}名が決勝トーナメントへ進出しました！`, 'success')
