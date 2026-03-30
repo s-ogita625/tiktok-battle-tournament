@@ -545,10 +545,10 @@ function renderGroupCard(group, participants) {
                 })
                 return standings.map(s => {
                   const p = participants.find(x => x.id === s.participantId)
-                  const isWithdrawn = p?.withdrawn === true
+                  const isWithdrawn = p?.withdrawn === true || s.rank === 9999
                   const isAdv = !isWithdrawn && s.rank <= (group.advanceCount || 1)
                   const showAdv = isAdv && hasBattleResult
-                  const rankDisplay = isWithdrawn ? '辞' : (hasBattleResult ? s.rank : '-')
+                  const rankDisplay = isWithdrawn ? '辞退' : (hasBattleResult ? s.rank : '-')
                   return `
                     <tr class="${showAdv ? 'viewer-row-advance' : ''} ${isWithdrawn ? 'viewer-row-withdrawn' : ''}">
                       <td>${rankDisplay}</td>
