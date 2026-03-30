@@ -1,5 +1,5 @@
 import { store } from '../data/store.js'
-import { recalcStandings, getTournamentAdvancers } from '../services/groupService.js'
+import { recalcStandings, getTournamentAdvancers, withdrawParticipant } from '../services/groupService.js'
 import { generateTournamentBracket } from '../services/tournamentService.js'
 import { renderBattleCard } from './BattleCard.js'
 import { convertImageUrl } from './ParticipantList.js'
@@ -54,7 +54,7 @@ export function renderGroupStage(container) {
 
     container.querySelector('#advance-btn')?.addEventListener('click', () => {
       const ct2 = store.getState().currentTournament
-      const advancers = getTournamentAdvancers(ct2.groups)
+      const advancers = getTournamentAdvancers(ct2.groups, ct2.participants)
       const bracket = generateTournamentBracket(
         advancers,
         ct2.settings.tournamentSize,
@@ -139,9 +139,11 @@ function renderGroupCard(group, participants, settings) {
 function renderStandingRow(standing, group, participants, hasBattleResult = true) {
   const p = participants.find(x => x.id === standing.participantId)
   if (!p) return ''
-  const isAdvancer = standing.rank <= (group.advanceCount || 1)
+  const isWithdrawn = p.withdrawn === true
+  const isAdvancer = !isWithdrawn && standing.rank <= (group.advanceCount || 1)
   const advanceMarker = isAdvancer && hasBattleResult ? `<span class="advance-indicator" title="進出確定"></span>` : ''
-  const rankClass = hasBattleResult && standing.rank <= 3 ? `rank-${standing.rank}` : 'rank-other'
+  const rankClass = !isWithdrawn && hasBattleResult && standing.rank <= 3 ? `rank-${standing.rank}` : 'rank-other'
+  const rankDisplay = isWithdrawn ? '辞' : (hasBattleResult ? standing.rank : '-')
 
   const standImgSrc = p.profileImageUrl ? (p.profileImageUrl.startsWith('data:') ? p.profileImageUrl : convertImageUrl(p.profileImageUrl)) : ''
   const avatarHtml = standImgSrc
@@ -149,12 +151,16 @@ function renderStandingRow(standing, group, participants, hasBattleResult = true
     : `<div class="avatar-initials" style="width:24px;height:24px;font-size:0.6rem">${p.name.slice(0, 2)}</div>`
 
   return `
-    <tr>
+    <tr class="${isWithdrawn ? 'standing-row--withdrawn' : ''}">
       <td>
         <div class="standing-player">
-          <div class="standing-rank ${rankClass}">${hasBattleResult ? standing.rank : '-'}</div>
+          <div class="standing-rank ${rankClass}">${rankDisplay}</div>
           ${avatarHtml}
-          <span style="font-size:0.82rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80px">${escHtml(p.name)}</span>
+          <span class="${isWithdrawn ? 'withdrawn-name' : ''}" style="font-size:0.82rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80px">${escHtml(p.name)}</span>
+          ${isWithdrawn
+            ? '<span class="withdrawn-badge">辞退</span>'
+            : `<button class="withdraw-btn" data-participant-id="${p.id}">辞退</button>`
+          }
           ${advanceMarker}
         </div>
       </td>
@@ -205,13 +211,14 @@ function attachGroupEvents(container, groups, participants) {
       const winnerId = score1 > score2 ? p1Id : score2 > score1 ? p2Id : null
 
       store.updateTournament(ct => {
+        const ps = ct.participants || []
         const newGroups = ct.groups.map(g => {
           const battleIdx = g.battles.findIndex(b => b.id === battleId)
           if (battleIdx === -1) return g
           const newBattles = [...g.battles]
           newBattles[battleIdx] = { ...newBattles[battleIdx], result: { winnerId, score1, score2 } }
           const newGroup = { ...g, battles: newBattles }
-          newGroup.standings = recalcStandings(newGroup)
+          newGroup.standings = recalcStandings(newGroup, ps)
           return newGroup
         })
         return { groups: newGroups }
@@ -223,17 +230,39 @@ function attachGroupEvents(container, groups, participants) {
     btn.addEventListener('click', () => {
       const battleId = btn.dataset.battleId
       store.updateTournament(ct => {
+        const ps = ct.participants || []
         const newGroups = ct.groups.map(g => {
           const battleIdx = g.battles.findIndex(b => b.id === battleId)
           if (battleIdx === -1) return g
           const newBattles = [...g.battles]
           newBattles[battleIdx] = { ...newBattles[battleIdx], result: null }
           const newGroup = { ...g, battles: newBattles }
-          newGroup.standings = recalcStandings(newGroup)
+          newGroup.standings = recalcStandings(newGroup, ps)
           return newGroup
         })
         return { groups: newGroups }
       })
+    })
+  })
+
+  container.querySelectorAll('.withdraw-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const pid = btn.dataset.participantId
+      const p = participants.find(x => x.id === pid)
+      if (!confirm(`「${p?.name}」を辞退させますか？\n未実施の対戦は不戦勝（相手に10万pt）になります。`)) return
+
+      store.updateTournament(ct => {
+        const newParticipants = ct.participants.map(x =>
+          x.id === pid ? { ...x, withdrawn: true, withdrawnAt: new Date().toISOString() } : x
+        )
+        const groupsAfterWithdraw = withdrawParticipant(ct.groups, pid)
+        const newGroups = groupsAfterWithdraw.map(g => ({
+          ...g,
+          standings: recalcStandings(g, newParticipants)
+        }))
+        return { participants: newParticipants, groups: newGroups }
+      })
+      showToast(`${p?.name}が辞退しました`, 'info')
     })
   })
 

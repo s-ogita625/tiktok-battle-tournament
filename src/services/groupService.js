@@ -90,7 +90,7 @@ function initStandings(participantIds) {
   }))
 }
 
-export function recalcStandings(group) {
+export function recalcStandings(group, participants = []) {
   const standings = initStandings(group.participantIds)
 
   for (const battle of group.battles) {
@@ -110,13 +110,19 @@ export function recalcStandings(group) {
     else                                         { s1.draws++; s2.draws++ }
   }
 
-  standings.sort((a, b) => {
+  const isWithdrawn = id => participants.find(x => x.id === id)?.withdrawn === true
+  const active    = standings.filter(s => !isWithdrawn(s.participantId))
+  const withdrawn = standings.filter(s =>  isWithdrawn(s.participantId))
+
+  active.sort((a, b) => {
     if (b.wins       !== a.wins)       return b.wins       - a.wins
     if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore
     return a.opponentTotalScore - b.opponentTotalScore
   })
-  standings.forEach((s, i) => { s.rank = i + 1 })
-  return standings
+  active.forEach((s, i) => { s.rank = i + 1 })
+  withdrawn.forEach(s => { s.rank = 9999 })
+
+  return [...active, ...withdrawn]
 }
 
 /**
@@ -124,19 +130,45 @@ export function recalcStandings(group) {
  *
  * 全グループの進出者を「総合スコア（勝利数 → 獲得スコア → 失点少）」で
  * ランキングし、1位vs最下位・2位vs(最下位-1)位…のシード配置にする。
- * この順序で advancerIds を返すと tournamentService の
- * generateTournamentBracket が自動的に 1位vs最下位 の対戦を組む。
+ * 辞退者は除外し、進出枠が足りない場合は他グループの次順位から補欠進出。
  */
-export function getTournamentAdvancers(groups) {
-  // 全グループから進出者を収集
+export function getTournamentAdvancers(groups, participants = []) {
+  const totalSlots = groups.reduce((sum, g) => sum + (g.advanceCount || 1), 0)
+  const isWithdrawn = id => participants.find(x => x.id === id)?.withdrawn === true
+
+  // 正規進出者を収集（rank <= advanceCount かつ非辞退）
   const raw = []
   const maxAdvance = Math.max(...groups.map(g => g.advanceCount || 1))
   for (let rank = 1; rank <= maxAdvance; rank++) {
     for (const group of groups) {
       if (rank <= (group.advanceCount || 1)) {
         const standing = (group.standings || []).find(s => s.rank === rank)
-        if (standing) {
-          raw.push({
+        if (!standing) continue
+        if (isWithdrawn(standing.participantId)) continue
+        raw.push({
+          participantId: standing.participantId,
+          groupRank:     standing.rank,
+          wins:          standing.wins,
+          totalScore:    standing.totalScore,
+          opponentScore: standing.opponentTotalScore,
+          groupName:     group.name
+        })
+      }
+    }
+  }
+
+  // 進出枠が足りない場合、補欠進出（他グループの次順位から成績順）
+  if (raw.length < totalSlots) {
+    const needed = totalSlots - raw.length
+    const alreadyIn = new Set(raw.map(r => r.participantId))
+    const candidates = []
+
+    for (const group of groups) {
+      for (const standing of (group.standings || [])) {
+        if (alreadyIn.has(standing.participantId)) continue
+        if (isWithdrawn(standing.participantId)) continue
+        if (standing.rank > (group.advanceCount || 1) && standing.rank < 9999) {
+          candidates.push({
             participantId: standing.participantId,
             groupRank:     standing.rank,
             wins:          standing.wins,
@@ -147,6 +179,13 @@ export function getTournamentAdvancers(groups) {
         }
       }
     }
+
+    candidates.sort((a, b) => {
+      if (b.wins        !== a.wins)        return b.wins        - a.wins
+      if (b.totalScore  !== a.totalScore)  return b.totalScore  - a.totalScore
+      return a.opponentScore - b.opponentScore
+    })
+    raw.push(...candidates.slice(0, needed))
   }
 
   // 総合順位でソート（勝利数→スコア→失点少）
@@ -156,8 +195,33 @@ export function getTournamentAdvancers(groups) {
     return a.opponentScore - b.opponentScore
   })
 
-  // 1位vs最下位・2位vs(最下位-1)… の対戦になるように配置
-  // generateTournamentBracket は slots[i] vs slots[n-1-i] で対戦を組む
-  // → raw をそのまま渡すだけで自動的に実現される
   return raw.map(r => r.participantId)
+}
+
+/**
+ * 参加者の辞退処理
+ * 辞退者との未実施バトルを不戦勝（相手10万pt）で埋めて groups を返す。
+ * standings の再計算は呼び出し側で行うこと。
+ */
+export function withdrawParticipant(groups, participantId) {
+  return groups.map(group => {
+    if (!group.participantIds.includes(participantId)) return group
+
+    const newBattles = group.battles.map(b => {
+      if (b.result !== null) return b
+      const isP1 = b.participant1Id === participantId
+      const isP2 = b.participant2Id === participantId
+      if (!isP1 && !isP2) return b
+
+      return {
+        ...b,
+        result: {
+          winnerId: isP1 ? b.participant2Id : b.participant1Id,
+          score1:   isP1 ? 0 : 100000,
+          score2:   isP2 ? 0 : 100000
+        }
+      }
+    })
+    return { ...group, battles: newBattles }
+  })
 }

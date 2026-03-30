@@ -538,22 +538,27 @@ function renderGroupCard(group, participants) {
         <tbody>
           ${standings.length > 0
             ? (() => {
-                // 1試合以上結果が出ているかチェック（引き分けも含む）
-                const hasBattleResult = standings.some(s => (s.wins + s.losses + (s.draws || 0)) > 0)
+                // 1試合以上結果が出ているかチェック（辞退者・引き分けも含む）
+                const hasBattleResult = standings.some(s => {
+                  const p = participants.find(x => x.id === s.participantId)
+                  return !p?.withdrawn && (s.wins + s.losses + (s.draws || 0)) > 0
+                })
                 return standings.map(s => {
                   const p = participants.find(x => x.id === s.participantId)
-                  const isAdv = s.rank <= (group.advanceCount || 1)
-                  // 結果が出ている場合のみ↑進出バッジを表示
+                  const isWithdrawn = p?.withdrawn === true
+                  const isAdv = !isWithdrawn && s.rank <= (group.advanceCount || 1)
                   const showAdv = isAdv && hasBattleResult
+                  const rankDisplay = isWithdrawn ? '辞' : (hasBattleResult ? s.rank : '-')
                   return `
-                    <tr class="${showAdv ? 'viewer-row-advance' : ''}">
-                      <td>${hasBattleResult ? s.rank : '-'}</td>
+                    <tr class="${showAdv ? 'viewer-row-advance' : ''} ${isWithdrawn ? 'viewer-row-withdrawn' : ''}">
+                      <td>${rankDisplay}</td>
                       <td>
                         <div style="display:flex;align-items:center;gap:6px">
                           ${p?.profileImageUrl
                             ? `<img src="${escHtml(getCachedImageUrl(p.profileImageUrl))}" style="width:22px;height:22px;border-radius:50%;object-fit:cover" onerror="this.style.display='none'" alt="" />`
                             : `<div class="avatar-initials" style="width:22px;height:22px;font-size:0.55rem">${(p?.name||'?').slice(0,2)}</div>`}
-                          <span>${escHtml(p?.name || '不明')}</span>
+                          <span class="${isWithdrawn ? 'withdrawn-name' : ''}">${escHtml(p?.name || '不明')}</span>
+                          ${isWithdrawn ? '<span class="withdrawn-badge">辞退</span>' : ''}
                           ${showAdv ? `<span style="color:var(--color-secondary);font-size:0.7rem">↑進出</span>` : ''}
                         </div>
                       </td>
