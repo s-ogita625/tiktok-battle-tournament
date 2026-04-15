@@ -2,6 +2,7 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [
+    { "source": "/api/auth",          "destination": "/api/auth.js" },
     { "source": "/api/publish",       "destination": "/api/publish.js" },
     { "source": "/api/gist-id",       "destination": "/api/gist-id.js" },
     { "source": "/api/upload-image",  "destination": "/api/upload-image.js" }

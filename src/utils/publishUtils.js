@@ -16,6 +16,8 @@
  * Classic token で発行してください（Fine-grained token は Gist 非対応）
  */
 
+import { getAdminSecret } from '../auth.js'
+
 const GIST_ID_STORAGE_KEY = 'tbt_gist_id'
 
 /** 保存済み Gist ID を取得 */
@@ -37,9 +39,13 @@ export function saveGistId(id) {
  */
 async function uploadImageToGist(participantId, base64DataUrl, gistId) {
   try {
+    const secret = getAdminSecret()
     const res = await fetch('/api/upload-image', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(secret ? { 'X-Admin-Secret': secret } : {})
+      },
       body: JSON.stringify({ participantId, base64: base64DataUrl, gistId })
     })
     const data = await res.json().catch(() => ({}))
@@ -53,9 +59,13 @@ async function uploadImageToGist(participantId, base64DataUrl, gistId) {
  * 公開対象の大会データを /api/publish に POST する内部関数
  */
 async function postToPublishApi(tournaments) {
+  const secret = getAdminSecret()
   const res = await fetch('/api/publish', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(secret ? { 'X-Admin-Secret': secret } : {})
+    },
     body: JSON.stringify({ tournaments })
   })
   const data = await res.json().catch(() => ({}))

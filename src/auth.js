@@ -1,37 +1,43 @@
 /**
- * auth.js — 管理画面のフロントエンドパスワードガード
+ * auth.js — 管理画面のログインガード
  *
- * ⚠️ 注意: フロントエンドのみの認証です。
- * データ自体はlocalStorageに保存されており、
- * 技術的な知識がある人はDevToolsからアクセス可能です。
- * 管理操作の誤操作防止・一般ユーザーからの保護が目的です。
+ * ログイン処理: /api/auth に POST して ADMIN_ID/ADMIN_PASSWORD を検証。
+ * 成功時に返ってきた ADMIN_SECRET を sessionStorage に保持し、
+ * 以降の API リクエスト (publish / upload-image) に X-Admin-Secret ヘッダーで付与する。
+ *
+ * フォールバック: /api/auth が 503 を返した場合（環境変数未設定）は
+ * ソースコード内のパスワードで照合（移行期間・ローカル開発用）。
  */
 
-const SESSION_KEY = 'tbt_admin_auth'
-// ハッシュ化した認証情報（平文で管理IDとパスをコードに直接書かない）
-// sha256("s.ogita@321.inc:321inc0926") を hex で格納
-const CREDENTIAL_HASH = '8f3d2a1b9c4e5f6a7b8c9d0e1f2a3b4c' // dummy, 後で計算
+const SESSION_KEY   = 'tbt_admin_auth'
+const SECRET_KEY    = 'tbt_admin_secret'
 
-// 実際の認証チェック — 入力値を正規化して比較
-function checkCredentials(id, pass) {
+// フォールバック用（環境変数未設定時のみ使用・移行期間対応）
+function fallbackCheckCredentials(id, pass) {
   return id.trim() === 's.ogita@321.inc' && pass === '321inc0926'
 }
 
 export function isAuthenticated() {
   try {
-    const token = sessionStorage.getItem(SESSION_KEY)
-    return token === SESSION_KEY + '_ok'
+    return sessionStorage.getItem(SESSION_KEY) === SESSION_KEY + '_ok'
   } catch {
     return false
   }
 }
 
-export function setAuthenticated() {
+/** ログイン成功時に /api/auth から受け取った secret を取得 */
+export function getAdminSecret() {
+  try { return sessionStorage.getItem(SECRET_KEY) || '' } catch { return '' }
+}
+
+export function setAuthenticated(secret = '') {
   sessionStorage.setItem(SESSION_KEY, SESSION_KEY + '_ok')
+  sessionStorage.setItem(SECRET_KEY, secret)
 }
 
 export function clearAuthentication() {
   sessionStorage.removeItem(SESSION_KEY)
+  sessionStorage.removeItem(SECRET_KEY)
 }
 
 /**
@@ -87,7 +93,7 @@ export function requireAuth(container, onSuccess) {
     </div>
   `
 
-  const form = container.querySelector('#auth-form')
+  const form      = container.querySelector('#auth-form')
   const idInput   = container.querySelector('#auth-id')
   const passInput = container.querySelector('#auth-pass')
   const errorEl   = container.querySelector('#auth-error')
@@ -105,25 +111,71 @@ export function requireAuth(container, onSuccess) {
     }
   })
 
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault()
     const id   = idInput.value
     const pass = passInput.value
+    const submitBtn = form.querySelector('[type=submit]')
 
-    if (checkCredentials(id, pass)) {
-      errorEl.style.display = 'none'
-      setAuthenticated()
-      container.innerHTML = ''
-      onSuccess()
-    } else {
+    submitBtn.disabled = true
+    submitBtn.textContent = '認証中...'
+    errorEl.style.display = 'none'
+
+    try {
+      // サーバー側認証（/api/auth）を試みる
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, pass })
+      })
+      const data = await res.json().catch(() => ({}))
+
+      if (res.status === 503) {
+        // 環境変数未設定（移行期間）→ フォールバック認証
+        if (fallbackCheckCredentials(id, pass)) {
+          setAuthenticated('')
+          container.innerHTML = ''
+          onSuccess()
+          return
+        }
+        errorEl.textContent = 'IDまたはパスワードが正しくありません'
+        errorEl.style.display = ''
+        passInput.value = ''
+        passInput.focus()
+        submitBtn.disabled = true
+        setTimeout(() => { submitBtn.disabled = false; submitBtn.textContent = 'ログイン' }, 2000)
+        return
+      }
+
+      if (res.ok && data.ok) {
+        setAuthenticated(data.secret || '')
+        container.innerHTML = ''
+        onSuccess()
+        return
+      }
+
+      // 認証失敗
+      errorEl.textContent = 'IDまたはパスワードが正しくありません'
       errorEl.style.display = ''
       passInput.value = ''
       passInput.focus()
-      // ブルートフォース対策: 連続失敗で短時間ロック
-      form.querySelector('[type=submit]').disabled = true
-      setTimeout(() => {
-        form.querySelector('[type=submit]').disabled = false
-      }, 2000)
+      submitBtn.disabled = true
+      setTimeout(() => { submitBtn.disabled = false; submitBtn.textContent = 'ログイン' }, 2000)
+
+    } catch {
+      // ネットワークエラー → フォールバック認証
+      if (fallbackCheckCredentials(id, pass)) {
+        setAuthenticated('')
+        container.innerHTML = ''
+        onSuccess()
+        return
+      }
+      errorEl.textContent = 'IDまたはパスワードが正しくありません'
+      errorEl.style.display = ''
+      passInput.value = ''
+      passInput.focus()
+      submitBtn.disabled = true
+      setTimeout(() => { submitBtn.disabled = false; submitBtn.textContent = 'ログイン' }, 2000)
     }
   })
 }

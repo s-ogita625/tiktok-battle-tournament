@@ -38,6 +38,15 @@ export default async function handler(req, res) {
     })
   }
 
+  // 管理者トークン認証（ADMIN_SECRET が設定されている場合のみチェック）
+  const adminSecret = process.env.ADMIN_SECRET
+  if (adminSecret) {
+    const reqSecret = req.headers['x-admin-secret'] || ''
+    if (reqSecret !== adminSecret) {
+      return res.status(403).json({ ok: false, message: '認証エラー: 管理者権限が必要です。再ログインしてください。' })
+    }
+  }
+
   let participantId, base64, gistId
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body
