@@ -132,17 +132,19 @@ function initApp() {
     renderParticipantForm(formArea, null)
     renderParticipantList(listArea, formArea)
 
-    listArea.addEventListener('assign-groups', () => {
+    listArea.addEventListener('assign-groups', (e) => {
       const ct = store.getState().currentTournament
       if (!ct || ct.participants.length < 2) return
 
-      const groups = assignGroups(ct.participants, ct.settings)
+      const manualGroupCount = e.detail?.groupCount || 0
+      const settingsWithGroupCount = { ...ct.settings, groupCount: manualGroupCount }
+      const groups = assignGroups(ct.participants, settingsWithGroupCount)
       store.updateTournament({ groups, stage: 'groups' })
       renderPage('groups')
       showToast(`${groups.length}グループに割り振りました！`, 'success')
     })
 
-    listArea.addEventListener('reset-and-reassign', () => {
+    listArea.addEventListener('reset-and-reassign', (e) => {
       const ct = store.getState().currentTournament
       if (!ct || ct.participants.length < 2) return
 
@@ -150,7 +152,9 @@ function initApp() {
       store.updateTournament({ groups: [], tournamentBracket: null, stage: 'participants' })
 
       const ct2 = store.getState().currentTournament
-      const groups = assignGroups(ct2.participants, ct2.settings)
+      const manualGroupCount = e.detail?.groupCount || 0
+      const settingsWithGroupCount = { ...ct2.settings, groupCount: manualGroupCount }
+      const groups = assignGroups(ct2.participants, settingsWithGroupCount)
       store.updateTournament({ groups, stage: 'groups' })
       renderPage('groups')
       showToast(`グループを振り直しました！（${groups.length}グループ）`, 'success')

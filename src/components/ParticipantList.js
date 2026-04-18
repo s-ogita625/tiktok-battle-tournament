@@ -1,6 +1,7 @@
 import { store } from '../data/store.js'
 import { formatDate } from '../utils/dateUtils.js'
 import { renderParticipantForm } from './ParticipantForm.js'
+import { calcGroupStructure } from '../services/groupService.js'
 
 export function renderParticipantList(container, formContainer) {
   function render() {
@@ -43,12 +44,20 @@ export function renderParticipantList(container, formContainer) {
     `
 
     container.querySelector('#auto-assign-btn')?.addEventListener('click', () => {
-      container.dispatchEvent(new CustomEvent('assign-groups'))
+      const ct2 = store.getState().currentTournament
+      if (!ct2) return
+      openGroupCountModal(ct2.participants.length, ct2.settings, (groupCount) => {
+        container.dispatchEvent(new CustomEvent('assign-groups', { detail: { groupCount } }))
+      })
     })
 
     container.querySelector('#reassign-btn')?.addEventListener('click', () => {
       if (!confirm('グループを振り直しますか？\n現在のグループ分けと全ての対戦結果・トーナメントブラケットがリセットされます。')) return
-      container.dispatchEvent(new CustomEvent('reset-and-reassign'))
+      const ct2 = store.getState().currentTournament
+      if (!ct2) return
+      openGroupCountModal(ct2.participants.length, ct2.settings, (groupCount) => {
+        container.dispatchEvent(new CustomEvent('reset-and-reassign', { detail: { groupCount } }))
+      })
     })
 
     container.querySelectorAll('[data-edit]').forEach(btn => {
@@ -160,6 +169,76 @@ export function convertImageUrl(url) {
     return `https://drive.google.com/uc?export=view&id=${openMatch[1]}`
   }
   return url
+}
+
+function openGroupCountModal(participantCount, settings, onConfirm) {
+  const maxGroups = Math.floor(participantCount / 2)
+  const defaultCount = calcGroupStructure(participantCount, settings.tournamentSize).groupCount
+
+  const existing = document.getElementById('group-count-modal')
+  if (existing) existing.remove()
+
+  const modal = document.createElement('div')
+  modal.id = 'group-count-modal'
+  modal.style.cssText = 'display:flex;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.6);align-items:center;justify-content:center'
+  modal.innerHTML = `
+    <div style="background:var(--color-surface);border-radius:12px;padding:24px;min-width:300px;max-width:380px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.4)">
+      <h2 style="font-size:1.1rem;font-weight:700;margin:0 0 8px">グループ数を設定</h2>
+      <p style="font-size:0.82rem;color:var(--color-text-muted);margin:0 0 16px">
+        トーナメント進出人数（${settings.tournamentSize}名）に合わせて各グループの進出人数が自動調整されます
+      </p>
+      <div style="margin-bottom:16px">
+        <label style="display:block;font-size:0.85rem;font-weight:600;margin-bottom:6px">グループ数（2〜${maxGroups}）</label>
+        <input id="group-count-input" type="number" min="2" max="${maxGroups}" value="${defaultCount}"
+          style="width:100%;padding:8px 12px;background:var(--color-surface-alt);border:1px solid var(--color-border);border-radius:8px;color:var(--color-text);font-size:1rem;box-sizing:border-box" />
+        <p id="group-count-error" style="color:var(--color-danger);font-size:0.8rem;margin:4px 0 0;display:none"></p>
+        <p id="group-count-hint" style="color:var(--color-text-muted);font-size:0.78rem;margin:4px 0 0"></p>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button id="group-count-cancel" class="btn btn-secondary">キャンセル</button>
+        <button id="group-count-confirm" class="btn btn-teal">✅ 振り分け実行</button>
+      </div>
+    </div>
+  `
+  document.body.appendChild(modal)
+
+  const input = modal.querySelector('#group-count-input')
+  const errorEl = modal.querySelector('#group-count-error')
+  const hintEl = modal.querySelector('#group-count-hint')
+
+  function updateHint() {
+    const v = parseInt(input.value, 10)
+    if (isNaN(v) || v < 2 || v > maxGroups) {
+      hintEl.textContent = ''
+      return
+    }
+    const { advancePerGroup } = calcGroupStructure(participantCount, settings.tournamentSize, v)
+    const minAdv = Math.min(...advancePerGroup)
+    const maxAdv = Math.max(...advancePerGroup)
+    hintEl.textContent = minAdv === maxAdv
+      ? `各グループ上位${minAdv}名が進出`
+      : `各グループ上位${minAdv}〜${maxAdv}名が進出`
+  }
+  updateHint()
+  input.addEventListener('input', updateHint)
+
+  const close = () => modal.remove()
+  modal.querySelector('#group-count-cancel').addEventListener('click', close)
+  modal.addEventListener('click', (e) => { if (e.target === modal) close() })
+
+  modal.querySelector('#group-count-confirm').addEventListener('click', () => {
+    const v = parseInt(input.value, 10)
+    if (isNaN(v) || v < 2 || v > maxGroups) {
+      errorEl.textContent = `2〜${maxGroups} の範囲で入力してください`
+      errorEl.style.display = ''
+      return
+    }
+    close()
+    onConfirm(v)
+  })
+
+  input.focus()
+  input.select()
 }
 
 function escHtml(str) {

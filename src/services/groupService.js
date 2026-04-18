@@ -3,12 +3,20 @@ import { scheduleGroupBattles } from './scheduleService.js'
 
 /**
  * グループ数と各グループ進出人数を計算
+ * @param {number} participantCount 参加者数
+ * @param {number} tournamentSize トーナメント進出人数
+ * @param {number} [manualGroupCount=0] 手動指定グループ数（0=自動計算）
  */
-export function calcGroupStructure(participantCount, tournamentSize) {
+export function calcGroupStructure(participantCount, tournamentSize, manualGroupCount = 0) {
   const maxGroups = Math.floor(participantCount / 2)
-  let groupCount = Math.min(Math.ceil(tournamentSize / 2), maxGroups)
-  if (groupCount < 2 && participantCount >= 4) groupCount = 2
-  if (groupCount < 1) groupCount = 1
+  let groupCount
+  if (manualGroupCount >= 2 && manualGroupCount <= maxGroups) {
+    groupCount = manualGroupCount
+  } else {
+    groupCount = Math.min(Math.ceil(tournamentSize / 2), maxGroups)
+    if (groupCount < 2 && participantCount >= 4) groupCount = 2
+    if (groupCount < 1) groupCount = 1
+  }
 
   const baseAdvance   = Math.floor(tournamentSize / groupCount)
   const extraGroups   = tournamentSize % groupCount
@@ -29,11 +37,11 @@ export function calcGroupStructure(participantCount, tournamentSize) {
  * Serpentine Snake Draft でグループ割り振りを実行
  */
 export function assignGroups(participants, settings) {
-  const { tournamentSize } = settings
+  const { tournamentSize, groupCount: manualGroupCount = 0 } = settings
   const n = participants.length
   if (n < 2) return []
 
-  const { groupCount, advancePerGroup, participantsPerGroup } = calcGroupStructure(n, tournamentSize)
+  const { groupCount, advancePerGroup, participantsPerGroup } = calcGroupStructure(n, tournamentSize, manualGroupCount)
   const sorted = [...participants].sort((a, b) => b.sales - a.sales)
 
   const groups = Array.from({ length: groupCount }, (_, i) => ({
