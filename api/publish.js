@@ -128,10 +128,14 @@ export default async function handler(req, res) {
     if (!gistRes.ok) {
       const errJson = await gistRes.json().catch(() => ({}))
       const status = gistRes.status
-      if (status === 401) return res.status(401).json({ ok: false, message: 'Token 認証エラー: GITHUB_TOKEN を確認してください（有効期限切れの可能性があります）' })
-      if (status === 403) return res.status(403).json({ ok: false, message: '権限エラー: Classic token の場合「gist」スコープにチェックが必要です。Fine-grained token は Gist に対応していないため Classic token を使用してください。' })
-      if (status === 404) return res.status(404).json({ ok: false, message: `Gist が見つかりません。Vercel の環境変数 GIST_ID を削除して再度お試しください。` })
-      return res.status(status).json({ ok: false, message: `GitHub Gist API エラー (${status}): ${errJson.message || '不明なエラー'}` })
+      // デバッグ情報（どの分岐のエラーか・元の env var の有無）を含める
+      const phase = effectiveGistId ? 'PATCH' : 'POST'
+      const hadEnvGistId = !!gistId
+      const ghMsg = errJson.message || '不明なエラー'
+      if (status === 401) return res.status(401).json({ ok: false, message: `Token 認証エラー (${phase}): GITHUB_TOKEN を確認してください（有効期限切れの可能性があります）。詳細: ${ghMsg}` })
+      if (status === 403) return res.status(403).json({ ok: false, message: `権限エラー (${phase}): gist スコープが必要です。Classic token を使用してください。詳細: ${ghMsg}` })
+      if (status === 404) return res.status(404).json({ ok: false, message: `Gist 404 (${phase}, envGistId=${hadEnvGistId}): ${ghMsg}。トークンに gist スコープがあるか確認してください。` })
+      return res.status(status).json({ ok: false, message: `GitHub Gist API エラー (${phase}, ${status}): ${ghMsg}` })
     }
 
     const gistJson = await gistRes.json()
