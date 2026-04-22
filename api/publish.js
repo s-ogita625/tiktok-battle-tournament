@@ -91,6 +91,7 @@ export default async function handler(req, res) {
 
   try {
     let gistRes
+    let effectiveGistId = gistId   // 実際に使用された Gist ID
 
     if (gistId) {
       // 既存 Gist を更新（PATCH）
@@ -103,8 +104,16 @@ export default async function handler(req, res) {
           files: { 'tournament-data.json': { content: jsonContent } }
         })
       })
-    } else {
-      // 初回：新規 Gist を作成（POST）
+
+      // 404（Gist が削除済み・環境変数の ID が無効など）ならフォールバックで新規作成
+      if (gistRes.status === 404) {
+        effectiveGistId = ''
+        gistRes = null
+      }
+    }
+
+    if (!effectiveGistId) {
+      // 初回 or 404 フォールバック：新規 Gist を作成（POST）
       gistRes = await fetch('https://api.github.com/gists', {
         method: 'POST',
         headers,
@@ -121,7 +130,7 @@ export default async function handler(req, res) {
       const status = gistRes.status
       if (status === 401) return res.status(401).json({ ok: false, message: 'Token 認証エラー: GITHUB_TOKEN を確認してください（有効期限切れの可能性があります）' })
       if (status === 403) return res.status(403).json({ ok: false, message: '権限エラー: Classic token の場合「gist」スコープにチェックが必要です。Fine-grained token は Gist に対応していないため Classic token を使用してください。' })
-      if (status === 404) return res.status(404).json({ ok: false, message: `Gist が見つかりません (GIST_ID: ${gistId})。Vercel の環境変数 GIST_ID を削除して再度お試しください。` })
+      if (status === 404) return res.status(404).json({ ok: false, message: `Gist が見つかりません。Vercel の環境変数 GIST_ID を削除して再度お試しください。` })
       return res.status(status).json({ ok: false, message: `GitHub Gist API エラー (${status}): ${errJson.message || '不明なエラー'}` })
     }
 
