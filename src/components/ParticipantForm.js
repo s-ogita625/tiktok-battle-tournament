@@ -2,6 +2,7 @@ import { store } from '../data/store.js'
 import { generateId } from '../utils/exportUtils.js'
 import { today, formatDate, getDatePart, getTimePart, makeUnavailEntry, makeAvailEntry, getTimeRanges } from '../utils/dateUtils.js'
 import { convertImageUrl } from './ParticipantList.js'
+import { compressImageDataUrl } from '../utils/imageUtils.js'
 
 export function renderParticipantForm(container, editingId = null) {
   const ct = store.getState().currentTournament
@@ -490,12 +491,15 @@ export function renderParticipantForm(container, editingId = null) {
         return
       }
       const reader = new FileReader()
-      reader.onload = (ev) => {
+      reader.onload = async (ev) => {
         const base64 = ev.target.result
-        formData.profileImageUrl = base64
+        // localStorage(約5MB上限)を圧迫しないよう、保存前に自動圧縮する。
+        // data:URL形式は維持されるため表示・公開処理は従来どおり動作する。
+        const compressed = await compressImageDataUrl(base64)
+        formData.profileImageUrl = compressed
         const urlInput = container.querySelector('#f-img')
         if (urlInput) urlInput.value = ''
-        updateImgPreview(base64, `✅ ${file.name}`)
+        updateImgPreview(compressed, `✅ ${file.name}`)
         showToast('画像をアップロードしました', 'success')
       }
       reader.readAsDataURL(file)

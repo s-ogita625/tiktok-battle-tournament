@@ -13,6 +13,26 @@ import { assignGroups } from './services/groupService.js'
 const appRoot = document.getElementById('app')
 
 // =============================================
+//  保存失敗（容量超過など）の通知ガード
+//  従来は保存失敗が握りつぶされ、参加者を追加しても
+//  リロードで消える（=サイレントなデータ消失）が起きていた。
+// =============================================
+let _saveErrorNotified = false
+window.addEventListener('tbt-save-error', (e) => {
+  if (_saveErrorNotified) return // 連続発火を1回に集約
+  _saveErrorNotified = true
+  setTimeout(() => { _saveErrorNotified = false }, 5000)
+  const quota = e.detail?.quota
+  const msg = quota
+    ? '⚠️ データを保存できませんでした（ブラウザの保存容量が上限に達しています）。\n\n' +
+      '入力内容はこのままでは失われる可能性があります。\n' +
+      '「設定 → 💾 データ管理」で画像を圧縮して容量を空けるか、\n' +
+      'データをエクスポートしてバックアップしてください。'
+    : '⚠️ データの保存に失敗しました: ' + (e.detail?.message || '不明なエラー')
+  try { alert(msg) } catch { /* 無視 */ }
+})
+
+// =============================================
 //  認証ガード: 未ログインの場合はログイン画面を表示
 // =============================================
 requireAuth(appRoot, initApp)

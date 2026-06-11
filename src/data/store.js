@@ -75,6 +75,18 @@ function saveState() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
     } catch (e) {
       console.error('状態の保存エラー:', e)
+      // 容量超過などで保存に失敗した場合、サイレントなデータ消失を防ぐため通知する。
+      // （従来は console.error のみで、ユーザーは保存できていないことに気づけなかった）
+      const isQuota = !!e && (
+        e.name === 'QuotaExceededError' ||
+        e.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+        /quota|exceeded/i.test(e.message || '')
+      )
+      try {
+        window.dispatchEvent(new CustomEvent('tbt-save-error', {
+          detail: { quota: isQuota, message: e.message || String(e) }
+        }))
+      } catch { /* SSR等でwindowが無い場合は無視 */ }
     }
   }, 300)
 }

@@ -1,6 +1,7 @@
 import { store } from '../data/store.js'
 import { exportToJson, importFromJson } from '../utils/exportUtils.js'
 import { publishTournamentData } from '../utils/publishUtils.js'
+import { compressImageDataUrl, dataUrlByteSize, formatBytes } from '../utils/imageUtils.js'
 
 export function renderSettings(container) {
   function render() {
@@ -88,9 +89,24 @@ export function renderSettings(container) {
 
         <div class="settings-section">
           <h2 class="settings-section-title">💾 データ管理</h2>
+          <div class="settings-row">
+            <div>
+              <div class="settings-label">ブラウザ保存容量</div>
+              <div class="settings-desc">この端末のローカル保存量（上限の目安は約5MB）</div>
+            </div>
+            <span class="badge ${storageBadgeClass()}" id="storage-usage-badge">${storageUsageText()}</span>
+          </div>
           <div class="data-actions">
             <button class="btn btn-secondary" id="export-btn">⬇️ データをエクスポート (JSON)</button>
             <button class="btn btn-secondary" id="import-btn">⬆️ データをインポート (JSON)</button>
+          </div>
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--color-border)">
+            <button class="btn btn-teal" id="compress-btn">🗜️ 画像を圧縮して容量を削減</button>
+            <p style="font-size:0.75rem;color:var(--color-text-muted);margin-top:8px;line-height:1.6">
+              すべての大会のプロフィール画像を縮小し、保存容量を空けます。<br>
+              画像の見た目はほぼ変わりません。実行前に自動でバックアップ(JSON)をダウンロードします。
+            </p>
+            <div id="compress-result" style="display:none;margin-top:8px;padding:8px 12px;border-radius:8px;font-size:0.82rem;line-height:1.6;white-space:pre-line"></div>
           </div>
         </div>
 
@@ -190,6 +206,92 @@ export function renderSettings(container) {
       }
     })
 
+    // 画像圧縮で容量削減
+    container.querySelector('#compress-btn')?.addEventListener('click', async () => {
+      const btn = container.querySelector('#compress-btn')
+      const resultEl = container.querySelector('#compress-result')
+
+      const fullState = store.getState()
+      const before = byteSizeOf(fullState)
+
+      if (!confirm(
+        `すべての大会のプロフィール画像を圧縮して保存容量を削減します。\n` +
+        `現在の使用量: ${formatBytes(before)}\n\n` +
+        `実行前にバックアップ(JSON)を自動ダウンロードします。続けますか？`
+      )) return
+
+      // 安全のため、実行前に必ず現状をバックアップ
+      try { exportToJson(fullState) } catch { /* 失敗してもブロックしない */ }
+
+      btn.disabled = true
+      btn.textContent = '⏳ 圧縮中...'
+      resultEl.style.display = ''
+      resultEl.style.background = 'rgba(255,255,255,0.05)'
+      resultEl.style.border = '1px solid var(--color-border)'
+      resultEl.style.color = 'var(--color-text-muted)'
+      resultEl.textContent = '⏳ 画像を圧縮しています...'
+
+      try {
+        let processed = 0
+        let changed = 0
+
+        // 大会オブジェクト内の data:画像 をすべて圧縮した新オブジェクトを返す
+        const compressTournament = async (t) => {
+          if (!t || !Array.isArray(t.participants)) return t
+          const newParticipants = []
+          for (const p of t.participants) {
+            const url = p.profileImageUrl || ''
+            if (url.startsWith('data:image')) {
+              processed++
+              const out = await compressImageDataUrl(url)
+              if (out !== url) changed++
+              newParticipants.push({ ...p, profileImageUrl: out })
+            } else {
+              newParticipants.push(p)
+            }
+          }
+          return { ...t, participants: newParticipants }
+        }
+
+        const newCurrent = fullState.currentTournament
+          ? await compressTournament(fullState.currentTournament)
+          : null
+        const newTournaments = []
+        for (const t of (fullState.tournaments || [])) {
+          newTournaments.push(await compressTournament(t))
+        }
+
+        // 一括保存（グループ・対戦結果などその他のデータは保持）
+        store.update({ currentTournament: newCurrent, tournaments: newTournaments })
+
+        const after = byteSizeOf(store.getState())
+        const saved = Math.max(0, before - after)
+
+        resultEl.style.background = 'rgba(76,175,80,0.1)'
+        resultEl.style.border = '1px solid rgba(76,175,80,0.3)'
+        resultEl.style.color = 'var(--color-success)'
+        resultEl.textContent =
+          `✅ 完了しました\n` +
+          `対象画像: ${processed}件（うち${changed}件を圧縮）\n` +
+          `使用量: ${formatBytes(before)} → ${formatBytes(after)}（${formatBytes(saved)} 削減）`
+
+        // 使用量バッジを更新
+        const badge = container.querySelector('#storage-usage-badge')
+        if (badge) {
+          badge.textContent = storageUsageText()
+          badge.className = `badge ${storageBadgeClass()}`
+        }
+      } catch (err) {
+        resultEl.style.background = 'rgba(244,67,54,0.1)'
+        resultEl.style.border = '1px solid rgba(244,67,54,0.3)'
+        resultEl.style.color = 'var(--color-danger)'
+        resultEl.textContent = `⚠️ 圧縮に失敗しました: ${err.message || err}`
+      } finally {
+        btn.disabled = false
+        btn.textContent = '🗜️ 画像を圧縮して容量を削減'
+      }
+    })
+
     // リセット
     container.querySelector('#reset-all-btn')?.addEventListener('click', () => {
       if (!confirm('全データを削除します。この操作は取り消せません。続けますか？')) return
@@ -219,6 +321,27 @@ function renderPublishStatus(currentTournament) {
   return `<div style="padding:8px 14px;border-radius:8px;font-size:0.82rem;margin-bottom:10px;background:rgba(76,175,80,0.1);border:1px solid rgba(76,175,80,0.3);color:var(--color-success)">
     ✅ 公開対象: ${publicOnes.map(t => `「${escHtml(t.title)}」`).join('・')} （${publicOnes.length}件）
   </div>`
+}
+
+/** state全体のおおよそのバイト数 */
+function byteSizeOf(state) {
+  try { return dataUrlByteSize(JSON.stringify(state)) } catch { return 0 }
+}
+
+/** localStorage上の現在の使用量テキスト */
+function storageUsageText() {
+  const bytes = byteSizeOf(store.getState())
+  const pct = Math.min(100, Math.round((bytes / (5 * 1024 * 1024)) * 100))
+  return `${formatBytes(bytes)}（約${pct}%）`
+}
+
+/** 使用量に応じたバッジ色クラス */
+function storageBadgeClass() {
+  const bytes = byteSizeOf(store.getState())
+  const pct = (bytes / (5 * 1024 * 1024)) * 100
+  if (pct >= 85) return 'badge-danger'
+  if (pct >= 60) return 'badge-warning'
+  return 'badge-muted'
 }
 
 function calcGroupProgress(groups) {
