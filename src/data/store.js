@@ -143,8 +143,18 @@ export const store = {
   openArchivedTournament(id) {
     const t = state.tournaments.find(t => t.id === id)
     if (!t) return
+    // 【データ消失防止】進行中の currentTournament が tournaments に未保存の場合、
+    // 上書きで破棄されないよう先に tournaments へ退避する。
+    // （従来は currentTournament を無条件に上書きしていたため、過去大会の「閲覧」を
+    //   押すと進行中の大会が消えていた）
+    let tournaments = state.tournaments
+    const cur = state.currentTournament
+    if (cur && cur.id && cur.id !== id && !tournaments.some(x => x.id === cur.id)) {
+      tournaments = [...tournaments, cur]
+    }
     state = {
       ...state,
+      tournaments,
       currentTournament: { ...t },
       appStage: 'edit'
     }

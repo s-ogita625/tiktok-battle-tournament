@@ -9,6 +9,7 @@ import { renderTournamentBracket } from './components/TournamentBracket.js'
 import { renderNoticeBoard } from './components/NoticeBoard.js'
 import { renderSettings } from './components/Settings.js'
 import { assignGroups } from './services/groupService.js'
+import { startGistImageAutoResolver } from './utils/gistImageResolver.js'
 
 const appRoot = document.getElementById('app')
 
@@ -54,6 +55,10 @@ function initApp() {
 
   // ナビバーにログアウト + 閲覧ページリンクを追加
   addHeaderActions()
+
+  // 公開画像（Gistの .b64 URL）を管理画面でも表示できるよう自動解決を開始
+  // （登竜門など、公開済みで画像がGist URL化されている大会の写真を表示する）
+  startGistImageAutoResolver(document.body)
 
   // =============================================
   //  ホーム画面
