@@ -81,11 +81,19 @@ function getLocalPublicTournaments() {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY)
     if (!raw) return []
     const state = JSON.parse(raw)
+    // 新形式(tournaments[])・旧形式(currentTournament)の両方に対応
     const all = [
       ...(state.currentTournament ? [state.currentTournament] : []),
       ...(state.tournaments || [])
     ]
-    return all.filter(t => t.isPublic === true)
+    // id重複を排除
+    const seen = new Set()
+    const unique = all.filter(t => {
+      if (!t || (t.id && seen.has(t.id))) return false
+      if (t.id) seen.add(t.id)
+      return true
+    })
+    return unique.filter(t => t.isPublic === true)
   } catch {
     return []
   }
@@ -168,6 +176,16 @@ export async function renderViewerApp(container) {
   // Gist RAW URL の画像を並列 fetch してキャッシュに積む（表示前に解決）
   await prefetchGistImages(allTournaments)
 
+  // 個別URL対応: ?event=<大会id> が指定されていればその大会を初期選択する
+  let initialIndex = 0
+  try {
+    const eventId = new URLSearchParams(window.location.search).get('event')
+    if (eventId) {
+      const idx = allTournaments.findIndex(t => t.id === eventId)
+      if (idx >= 0) initialIndex = idx
+    }
+  } catch { /* 無視 */ }
+
   container.innerHTML = `
     <div class="viewer-layout">
       <!-- サイドバー：大会一覧 -->
@@ -175,7 +193,7 @@ export async function renderViewerApp(container) {
         <div class="viewer-sidebar-title">大会一覧</div>
         <div class="viewer-sidebar-list">
           ${allTournaments.map((t, i) => `
-            <button class="viewer-tournament-btn ${i === 0 ? 'active' : ''}"
+            <button class="viewer-tournament-btn ${i === initialIndex ? 'active' : ''}"
                     data-tournament-idx="${i}">
               ${t.stage !== 'finished' ? `<span class="viewer-active-dot"></span>` : ''}
               ${escHtml(t.title || '無題の大会')}
@@ -189,9 +207,9 @@ export async function renderViewerApp(container) {
     </div>
   `
 
-  // 最初の大会を表示
+  // 選択中の大会を表示（?event 指定があればその大会、なければ先頭）
   const mainEl = container.querySelector('#viewer-main')
-  renderTournamentDetail(mainEl, allTournaments[0])
+  renderTournamentDetail(mainEl, allTournaments[initialIndex])
 
   // サイドバーの大会ボタン切り替え
   container.querySelectorAll('.viewer-tournament-btn').forEach(btn => {

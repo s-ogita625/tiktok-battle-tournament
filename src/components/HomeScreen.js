@@ -4,10 +4,9 @@ import { publishTournamentData } from '../utils/publishUtils.js'
 
 export function renderHomeScreen(container, onEnterTournament) {
   function render() {
-    const { tournaments, currentTournament } = store.getState()
-
-    // 進行中の大会（まだアーカイブされていないもの）
-    const hasActive = !!currentTournament
+    const { tournaments } = store.getState()
+    const activeTournaments = tournaments.filter(t => !t.archived)
+    const pastTournaments = tournaments.filter(t => t.archived)
 
     container.innerHTML = `
       <div class="home-wrap">
@@ -20,20 +19,20 @@ export function renderHomeScreen(container, onEnterTournament) {
           </button>
         </div>
 
-        ${hasActive ? `
+        ${activeTournaments.length > 0 ? `
           <div class="home-section">
             <h2 class="home-section-title">🔥 進行中の大会</h2>
             <div class="home-tournament-list">
-              ${renderActiveTournamentCard(currentTournament)}
+              ${activeTournaments.map(t => renderTournamentCard(t, false)).join('')}
             </div>
           </div>
         ` : ''}
 
-        ${tournaments.length > 0 ? `
+        ${pastTournaments.length > 0 ? `
           <div class="home-section">
             <h2 class="home-section-title">📋 過去の大会</h2>
             <div class="home-tournament-list">
-              ${tournaments.slice().reverse().map(t => renderTournamentCard(t)).join('')}
+              ${pastTournaments.slice().reverse().map(t => renderTournamentCard(t, true)).join('')}
             </div>
           </div>
         ` : ''}
@@ -65,30 +64,12 @@ export function renderHomeScreen(container, onEnterTournament) {
             <div class="form-group" style="margin-bottom:24px">
               <label class="form-label">バトル開始時刻（デフォルト）</label>
               <div id="times-list" style="display:flex;flex-direction:column;gap:8px;margin-top:6px">
+                ${['21:00','21:30','22:00','22:30','23:00','23:30'].map(t => `
                 <div style="display:flex;gap:8px;align-items:center">
-                  <input class="form-input time-entry" type="time" value="21:00" style="width:130px" />
+                  <input class="form-input time-entry" type="time" value="${t}" style="width:130px" />
                   <button type="button" class="btn btn-danger btn-sm remove-time" style="padding:6px 10px">✕</button>
                 </div>
-                <div style="display:flex;gap:8px;align-items:center">
-                  <input class="form-input time-entry" type="time" value="21:30" style="width:130px" />
-                  <button type="button" class="btn btn-danger btn-sm remove-time" style="padding:6px 10px">✕</button>
-                </div>
-                <div style="display:flex;gap:8px;align-items:center">
-                  <input class="form-input time-entry" type="time" value="22:00" style="width:130px" />
-                  <button type="button" class="btn btn-danger btn-sm remove-time" style="padding:6px 10px">✕</button>
-                </div>
-                <div style="display:flex;gap:8px;align-items:center">
-                  <input class="form-input time-entry" type="time" value="22:30" style="width:130px" />
-                  <button type="button" class="btn btn-danger btn-sm remove-time" style="padding:6px 10px">✕</button>
-                </div>
-                <div style="display:flex;gap:8px;align-items:center">
-                  <input class="form-input time-entry" type="time" value="23:00" style="width:130px" />
-                  <button type="button" class="btn btn-danger btn-sm remove-time" style="padding:6px 10px">✕</button>
-                </div>
-                <div style="display:flex;gap:8px;align-items:center">
-                  <input class="form-input time-entry" type="time" value="23:30" style="width:130px" />
-                  <button type="button" class="btn btn-danger btn-sm remove-time" style="padding:6px 10px">✕</button>
-                </div>
+                `).join('')}
               </div>
               <button type="button" class="btn btn-secondary btn-sm" id="add-time" style="margin-top:8px;align-self:flex-start">＋ 時刻を追加</button>
             </div>
@@ -142,7 +123,7 @@ export function renderHomeScreen(container, onEnterTournament) {
       if (e.target === e.currentTarget) closeModal()
     })
 
-    // 大会作成フォーム送信
+    // 大会作成フォーム送信（他の進行中イベントは終了させない＝並行進行）
     container.querySelector('#create-form')?.addEventListener('submit', e => {
       e.preventDefault()
       const title = container.querySelector('#tournament-title').value.trim()
@@ -151,13 +132,7 @@ export function renderHomeScreen(container, onEnterTournament) {
       const times = [...container.querySelectorAll('.time-entry')]
         .map(i => i.value).filter(Boolean)
 
-      // 進行中の大会がある場合はアーカイブしてから新規作成
-      const current = store.getState().currentTournament
-      if (current) {
-        store.archiveCurrentTournament()
-      }
-
-      const newTournament = {
+      store.createTournament({
         ...defaultTournament,
         id: generateId(),
         title,
@@ -166,70 +141,51 @@ export function renderHomeScreen(container, onEnterTournament) {
           tournamentSize: selectedSize,
           defaultBattleTimes: times.length > 0 ? times : ['21:00', '21:30', '22:00', '22:30', '23:00', '23:30']
         }
-      }
-
-      store.update({ currentTournament: newTournament, appStage: 'edit' })
+      })
       onEnterTournament()
     })
 
-    // 進行中の大会を再開
-    container.querySelector('#resume-active-btn')?.addEventListener('click', () => {
-      store.update({ appStage: 'edit' })
-      onEnterTournament()
-    })
-
-    // 過去大会カードのイベント
+    // 大会カードを開く（進行中・過去とも）
     container.querySelectorAll('[data-open-tournament]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const id = btn.dataset.openTournament
-        store.openArchivedTournament(id)
+        store.openTournament(btn.dataset.openTournament)
         onEnterTournament()
       })
     })
 
+    // 削除（過去大会のみ）
     container.querySelectorAll('[data-delete-tournament]').forEach(btn => {
       btn.addEventListener('click', () => {
         const id = btn.dataset.deleteTournament
         const t = store.getState().tournaments.find(x => x.id === id)
         if (!confirm(`「${t?.title}」を削除しますか？この操作は取り消せません。`)) return
-        store.deleteArchivedTournament(id)
+        store.deleteTournament(id)
       })
     })
 
-    // 公開/非公開トグル（進行中の大会）
-    container.querySelector('#toggle-active-public')?.addEventListener('click', async () => {
-      const ct = store.getState().currentTournament
-      if (!ct) return
-      const newIsPublic = !ct.isPublic
-      store.updateTournament({ isPublic: newIsPublic })
-      await autoPublish()
-    })
-
-    // 公開/非公開トグル（過去大会）
+    // 公開/非公開トグル
     container.querySelectorAll('[data-toggle-public]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.dataset.togglePublic
-        const { tournaments } = store.getState()
-        const t = tournaments.find(x => x.id === id)
+        const t = store.getState().tournaments.find(x => x.id === id)
         if (!t) return
-        const updated = tournaments.map(x => x.id === id ? { ...x, isPublic: !x.isPublic } : x)
-        store.update({ tournaments: updated })
+        store.setPublic(id, !t.isPublic)
         await autoPublish()
       })
+    })
+
+    // 閲覧リンクをコピー
+    container.querySelectorAll('[data-copy-link]').forEach(btn => {
+      btn.addEventListener('click', () => copyViewerLink(btn.dataset.copyLink))
     })
   }
 
   /**
    * 公開中の大会を自動的に /api/publish へ送信する
-   * トークン不要（サーバー側で管理）
    */
   async function autoPublish() {
-    const { currentTournament, tournaments } = store.getState()
-    const all = [
-      ...(currentTournament ? [currentTournament] : []),
-      ...tournaments
-    ]
-    const publicOnes = all.filter(t => t.isPublic === true)
+    const { tournaments } = store.getState()
+    const publicOnes = tournaments.filter(t => t.isPublic === true)
 
     const result = await publishTournamentData(publicOnes)
     if (result.ok) {
@@ -243,59 +199,62 @@ export function renderHomeScreen(container, onEnterTournament) {
   render()
 }
 
-function renderActiveTournamentCard(t) {
+/** 閲覧ページの個別リンクをクリップボードにコピー */
+function copyViewerLink(id) {
+  const url = `${window.location.origin}/viewer.html?event=${encodeURIComponent(id)}`
+  const done = () => showHomeToast('🔗 閲覧リンクをコピーしました', 'success')
+  const fallback = () => {
+    const ta = document.createElement('textarea')
+    ta.value = url
+    ta.style.position = 'fixed'; ta.style.opacity = '0'
+    document.body.appendChild(ta); ta.select()
+    try { document.execCommand('copy'); done() } catch { prompt('以下のURLをコピーしてください', url) }
+    ta.remove()
+  }
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(url).then(done).catch(fallback)
+  } else {
+    fallback()
+  }
+}
+
+/**
+ * 大会カード（進行中・過去共通）
+ * @param {object} t 大会
+ * @param {boolean} isPast 過去大会か
+ */
+function renderTournamentCard(t, isPast) {
   const date = t.createdAt ? new Date(t.createdAt).toLocaleDateString('ja-JP') : '日付不明'
   const participantCount = (t.participants || []).length
+  const isPublic = !!t.isPublic
+
   const stageLabel = {
     participants: '参加者登録中',
     groups: 'グループステージ進行中',
     tournament: '決勝トーナメント進行中',
-    finished: '終了'
+    finished: '終了',
+    settings: '設定',
+    notice: 'お知らせ'
   }[t.stage] || t.stage
-  const isPublic = !!t.isPublic
 
-  return `
-    <div class="home-tournament-card home-active-card">
-      <div class="home-tc-main">
-        <div class="home-tc-icon">🔥</div>
-        <div class="home-tc-info">
-          <div class="home-tc-title">${escHtml(t.title)}</div>
-          <div class="home-tc-meta">
-            ${date} ／ ${participantCount}名参加 ／
-            <span class="home-active-badge">${stageLabel}</span>
-          </div>
-        </div>
-      </div>
-      <div class="home-tc-actions">
-        <button class="btn btn-sm ${isPublic ? 'btn-teal' : 'btn-secondary'}" id="toggle-active-public"
-                title="${isPublic ? '閲覧ページで公開中（クリックで非公開）' : '非公開（クリックで公開）'}">
-          ${isPublic ? '🌐 公開中' : '🔒 非公開'}
-        </button>
-        <button class="btn btn-primary btn-sm" id="resume-active-btn">▶ 再開</button>
-      </div>
-    </div>
-  `
-}
-
-function renderTournamentCard(t) {
-  const date = t.createdAt ? new Date(t.createdAt).toLocaleDateString('ja-JP') : '日付不明'
-  const participantCount = (t.participants || []).length
   const hasWinner = !!t.tournamentBracket?.winner
   const winnerName = hasWinner
     ? (t.participants || []).find(p => p.id === t.tournamentBracket.winner)?.name || '不明'
     : null
-  const isPublic = !!t.isPublic
+
+  const icon = isPast ? (hasWinner ? '🏆' : '⚔️') : '🔥'
+
+  const meta = isPast
+    ? `${date} ／ ${participantCount}名参加${winnerName ? ` ／ 優勝: <strong style="color:var(--color-secondary)">${escHtml(winnerName)}</strong>` : ''}`
+    : `${date} ／ ${participantCount}名参加 ／ <span class="home-active-badge">${escHtml(stageLabel)}</span>`
 
   return `
-    <div class="home-tournament-card">
+    <div class="home-tournament-card ${isPast ? '' : 'home-active-card'}">
       <div class="home-tc-main">
-        <div class="home-tc-icon">${hasWinner ? '🏆' : '⚔️'}</div>
+        <div class="home-tc-icon">${icon}</div>
         <div class="home-tc-info">
           <div class="home-tc-title">${escHtml(t.title)}</div>
-          <div class="home-tc-meta">
-            ${date} ／ ${participantCount}名参加
-            ${winnerName ? ` ／ 優勝: <strong style="color:var(--color-secondary)">${escHtml(winnerName)}</strong>` : ''}
-          </div>
+          <div class="home-tc-meta">${meta}</div>
         </div>
       </div>
       <div class="home-tc-actions">
@@ -303,8 +262,9 @@ function renderTournamentCard(t) {
                 title="${isPublic ? '閲覧ページで公開中（クリックで非公開）' : '非公開（クリックで公開）'}">
           ${isPublic ? '🌐 公開中' : '🔒 非公開'}
         </button>
-        <button class="btn btn-secondary btn-sm" data-open-tournament="${t.id}">👁 閲覧</button>
-        <button class="btn btn-danger btn-sm" data-delete-tournament="${t.id}">🗑</button>
+        <button class="btn btn-secondary btn-sm" data-copy-link="${t.id}" title="この大会の閲覧リンクをコピー">🔗 リンク</button>
+        <button class="btn btn-primary btn-sm" data-open-tournament="${t.id}">${isPast ? '👁 開く' : '▶ 開く'}</button>
+        ${isPast ? `<button class="btn btn-danger btn-sm" data-delete-tournament="${t.id}" title="削除">🗑</button>` : ''}
       </div>
     </div>
   `

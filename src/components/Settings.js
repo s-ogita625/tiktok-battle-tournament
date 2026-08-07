@@ -69,6 +69,15 @@ export function renderSettings(container) {
             <span class="settings-label">グループステージ進捗</span>
             <span class="badge badge-muted">${calcGroupProgress(groups)}</span>
           </div>
+          <div class="data-actions" style="margin-top:12px">
+            <button class="btn btn-secondary" id="copy-link-btn">🔗 閲覧リンクをコピー</button>
+            ${ct.archived
+              ? `<button class="btn btn-teal" id="unarchive-btn">↩️ 進行中に戻す</button>`
+              : `<button class="btn btn-secondary" id="archive-btn">🏁 この大会を終了する</button>`}
+          </div>
+          <p style="font-size:0.75rem;color:var(--color-text-muted);margin-top:8px;line-height:1.6">
+            「終了」すると過去の大会一覧へ移動します（データは保持されます）。数値の更新は進行中のまま続けられます。
+          </p>
         </div>
 
         <div class="settings-section">
@@ -159,12 +168,8 @@ export function renderSettings(container) {
 
     // 公開データ更新
     container.querySelector('#publish-btn')?.addEventListener('click', async () => {
-      const { currentTournament, tournaments } = store.getState()
-      const all = [
-        ...(currentTournament ? [currentTournament] : []),
-        ...tournaments
-      ]
-      const publicOnes = all.filter(t => t.isPublic === true)
+      const { tournaments } = store.getState()
+      const publicOnes = tournaments.filter(t => t.isPublic === true)
 
       const btn = container.querySelector('#publish-btn')
       const resultEl = container.querySelector('#publish-result')
@@ -253,16 +258,13 @@ export function renderSettings(container) {
           return { ...t, participants: newParticipants }
         }
 
-        const newCurrent = fullState.currentTournament
-          ? await compressTournament(fullState.currentTournament)
-          : null
         const newTournaments = []
         for (const t of (fullState.tournaments || [])) {
           newTournaments.push(await compressTournament(t))
         }
 
         // 一括保存（グループ・対戦結果などその他のデータは保持）
-        store.update({ currentTournament: newCurrent, tournaments: newTournaments })
+        store.update({ tournaments: newTournaments })
 
         const after = byteSizeOf(store.getState())
         const saved = Math.max(0, before - after)
@@ -292,6 +294,36 @@ export function renderSettings(container) {
       }
     })
 
+    // 閲覧リンクをコピー
+    container.querySelector('#copy-link-btn')?.addEventListener('click', () => {
+      const id = store.getState().currentTournament?.id
+      if (!id) return
+      const url = `${window.location.origin}/viewer.html?event=${encodeURIComponent(id)}`
+      const done = () => showToast('🔗 閲覧リンクをコピーしました', 'success')
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(url).then(done).catch(() => prompt('以下のURLをコピーしてください', url))
+      } else {
+        prompt('以下のURLをコピーしてください', url)
+      }
+    })
+
+    // この大会を終了する（過去大会化）
+    container.querySelector('#archive-btn')?.addEventListener('click', () => {
+      const ct2 = store.getState().currentTournament
+      if (!ct2) return
+      if (!confirm(`「${ct2.title}」を終了して過去の大会に移動しますか？\n（データは保持され、後から「進行中に戻す」ことも可能です）`)) return
+      store.setArchived(ct2.id, true)
+      showToast('大会を終了しました', 'info')
+    })
+
+    // 進行中に戻す
+    container.querySelector('#unarchive-btn')?.addEventListener('click', () => {
+      const ct2 = store.getState().currentTournament
+      if (!ct2) return
+      store.setArchived(ct2.id, false)
+      showToast('進行中に戻しました', 'success')
+    })
+
     // リセット
     container.querySelector('#reset-all-btn')?.addEventListener('click', () => {
       if (!confirm('全データを削除します。この操作は取り消せません。続けますか？')) return
@@ -310,8 +342,7 @@ export function renderSettings(container) {
 
 function renderPublishStatus(currentTournament) {
   const { tournaments } = store.getState()
-  const all = [...(currentTournament ? [currentTournament] : []), ...tournaments]
-  const publicOnes = all.filter(t => t.isPublic)
+  const publicOnes = tournaments.filter(t => t.isPublic)
   if (publicOnes.length === 0) {
     return `<div style="padding:10px 14px;border-radius:8px;font-size:0.82rem;margin-bottom:10px;background:rgba(255,193,7,0.1);border:1px solid rgba(255,193,7,0.3);color:#c68000">
       ⚠️ 現在「公開中」の大会がありません。<br>
