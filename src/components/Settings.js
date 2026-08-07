@@ -102,10 +102,10 @@ export function renderSettings(container) {
           </div>
 
           <div class="data-actions" style="margin-top:10px">
-            <button class="btn btn-primary" id="publish-btn" ${ct.isPublic ? '' : 'disabled title="公開中にすると反映できます"'}>🚀 最新の内容を反映する</button>
+            <button class="btn btn-primary" id="publish-btn" ${ct.isPublic ? '' : 'disabled title="公開中にすると反映できます"'}>🚀 この大会を閲覧ページに反映</button>
           </div>
           <p style="font-size:0.75rem;color:var(--color-text-muted);margin-top:8px;line-height:1.6">
-            「公開中」に切り替えると自動で反映されます。公開後に数値を更新したら「🚀 最新の内容を反映する」で閲覧ページを更新してください。
+            「公開中」に切り替えると自動で反映されます。公開後に数値を更新したら「🚀 この大会を閲覧ページに反映」で閲覧ページを更新してください。
           </p>
           <div id="publish-result" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;font-size:0.82rem;line-height:1.6;white-space:pre-line"></div>
         </div>
@@ -180,20 +180,27 @@ export function renderSettings(container) {
       store.updateTournament(ct => ({ settings: { ...ct.settings, defaultBattleTimes: times } }))
     })
 
-    // 公開中の全大会を /api/publish へ送信する共通処理
-    async function runPublish(startMsg = '⏳ 準備中...') {
+    // 「開いているこの大会だけ」を閲覧ページへ反映する共通処理。
+    //  他の公開中大会のデータには触れない（マージ方式）。
+    //  opts.remove=true のときは公開から外す（他大会は保持）。
+    async function publishCurrentEvent({ startMsg, successMsg, remove = false } = {}) {
+      const ct2 = store.getState().currentTournament
+      if (!ct2) return { ok: false, message: '大会が選択されていません' }
       const resultEl = container.querySelector('#publish-result')
-      const publicOnes = store.getState().tournaments.filter(t => t.isPublic === true)
       if (resultEl) {
         resultEl.style.display = ''
         resultEl.style.background = 'rgba(255,255,255,0.05)'
         resultEl.style.border = '1px solid var(--color-border)'
         resultEl.style.color = 'var(--color-text-muted)'
-        resultEl.textContent = startMsg
+        resultEl.textContent = startMsg || '⏳ 反映中...'
       }
-      const result = await publishTournamentData(publicOnes, (msg) => {
-        if (resultEl) resultEl.textContent = msg
-      })
+      const result = await publishTournamentData(
+        remove ? [] : [ct2],
+        (msg) => { if (resultEl) resultEl.textContent = msg },
+        remove
+          ? { removeIds: [ct2.id], message: successMsg || `✅ 「${ct2.title}」を非公開にしました` }
+          : { message: successMsg || `✅ 「${ct2.title}」を反映しました` }
+      )
       if (resultEl) {
         resultEl.style.background = result.ok ? 'rgba(76,175,80,0.1)' : 'rgba(244,67,54,0.1)'
         resultEl.style.border = result.ok ? '1px solid rgba(76,175,80,0.3)' : '1px solid rgba(244,67,54,0.3)'
@@ -203,25 +210,27 @@ export function renderSettings(container) {
       return result
     }
 
-    // 公開ON/OFF切替（この大会）→ 自動で反映
+    // 公開ON/OFF切替（この大会だけ）→ 自動で反映
     container.querySelector('#toggle-public-btn')?.addEventListener('click', async () => {
       const ct2 = store.getState().currentTournament
       if (!ct2) return
       const nextPublic = !ct2.isPublic
       const btn = container.querySelector('#toggle-public-btn')
       btn.disabled = true
-      store.setPublic(ct2.id, nextPublic) // ← 再描画でボタン表示も更新される
-      await runPublish(nextPublic ? '⏳ 公開して反映中...' : '⏳ 非公開にして反映中...')
+      store.setPublic(ct2.id, nextPublic) // 再描画でボタン表示も更新
+      await publishCurrentEvent(nextPublic
+        ? { startMsg: '⏳ 公開して反映中...', successMsg: `✅ 「${ct2.title}」を公開しました` }
+        : { remove: true, startMsg: '⏳ 非公開にして反映中...' })
     })
 
-    // 最新の内容を反映（数値更新後の再送信）
+    // この大会の最新の内容を反映（数値更新後の再送信・この大会だけ）
     container.querySelector('#publish-btn')?.addEventListener('click', async () => {
       const btn = container.querySelector('#publish-btn')
       btn.disabled = true
       btn.textContent = '⏳ 反映中...'
-      await runPublish()
+      await publishCurrentEvent({})
       btn.disabled = false
-      btn.textContent = '🚀 最新の内容を反映する'
+      btn.textContent = '🚀 この大会を閲覧ページに反映'
     })
 
     // エクスポート
