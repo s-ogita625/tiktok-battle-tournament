@@ -133,19 +133,30 @@ async function convertImages(tournaments, onProgress) {
   })
 
   const uploadedUrls = {}
+  const failedIds = []
+  const sleep = ms => new Promise(r => setTimeout(r, ms))
   if (uploadTasks.length > 0) {
     onProgress?.(`⏳ 画像をアップロード中... (${uploadTasks.length}件)`)
     for (let i = 0; i < uploadTasks.length; i++) {
       const task = uploadTasks[i]
       onProgress?.(`⏳ 画像をアップロード中... (${i + 1}/${uploadTasks.length}件)`)
-      const result = await uploadImageToGist(task.participantId, task.base64, currentGistId)
-      if (result.ok && result.rawUrl) {
-        uploadedUrls[task.participantId] = result.rawUrl
-        if (!currentGistId && result.gistId) {
-          currentGistId = result.gistId
-          saveGistId(currentGistId)
+      // 一時的な失敗（レート制限・瞬断など）に備えて最大3回リトライ
+      let ok = false
+      for (let attempt = 1; attempt <= 3 && !ok; attempt++) {
+        const result = await uploadImageToGist(task.participantId, task.base64, currentGistId)
+        if (result.ok && result.rawUrl) {
+          uploadedUrls[task.participantId] = result.rawUrl
+          if (!currentGistId && result.gistId) {
+            currentGistId = result.gistId
+            saveGistId(currentGistId)
+          }
+          ok = true
+        } else if (attempt < 3) {
+          onProgress?.(`⏳ 画像を再試行中... (${i + 1}/${uploadTasks.length}件, ${attempt + 1}回目)`)
+          await sleep(600 * attempt) // バックオフ
         }
       }
+      if (!ok) failedIds.push(task.participantId)
     }
   }
 
@@ -155,7 +166,7 @@ async function convertImages(tournaments, onProgress) {
       uploadedUrls[p.id] ? { ...p, profileImageUrl: uploadedUrls[p.id] } : p
     )
   }))
-  return { convertedTournaments, imgCount: uploadTasks.length }
+  return { convertedTournaments, imgCount: uploadTasks.length, failedIds }
 }
 
 /**
@@ -190,11 +201,29 @@ export async function publishTournamentData(tournamentsToUpsert, onProgress, opt
     }
 
     // 2) upsert対象の画像を変換
-    const { convertedTournaments, imgCount } = await convertImages(upserts, onProgress)
+    const { convertedTournaments, imgCount, failedIds } = await convertImages(upserts, onProgress)
+
+    // 2.5) 画像アップロードに失敗した参加者は、既存の公開画像URLがあれば維持する
+    //      （失敗した data: をそのまま送ると publish API 側で空文字に落ち、
+    //        以前表示できていた画像まで消えてしまうのを防ぐ）
+    const existingById = new Map(existing.tournaments.map(t => [t.id, t]))
+    const safeTournaments = convertedTournaments.map(t => {
+      const prevImg = new Map(((existingById.get(t.id) || {}).participants || []).map(p => [p.id, p.profileImageUrl]))
+      return {
+        ...t,
+        participants: (t.participants || []).map(p => {
+          if (p.profileImageUrl && p.profileImageUrl.startsWith('data:')) {
+            const prev = prevImg.get(p.id)
+            if (prev && !String(prev).startsWith('data:')) return { ...p, profileImageUrl: prev }
+          }
+          return p
+        })
+      }
+    })
 
     // 3) マージ（id一致で差し替え／removeIdsを削除）
     const byId = new Map(existing.tournaments.map(t => [t.id, t]))
-    for (const t of convertedTournaments) byId.set(t.id, { ...t, isPublic: true })
+    for (const t of safeTournaments) byId.set(t.id, { ...t, isPublic: true })
     for (const id of removeIds) byId.delete(id)
     const merged = [...byId.values()]
 
@@ -204,10 +233,13 @@ export async function publishTournamentData(tournamentsToUpsert, onProgress, opt
 
     if (res.ok && data.ok) {
       if (data.gistId) saveGistId(data.gistId)
-      const imgNote = imgCount > 0 ? `\n画像 ${imgCount}件をアップロードしました。` : ''
+      const failCount = (failedIds || []).length
+      let note = ''
+      if (imgCount > 0 && failCount === 0) note = `\n画像 ${imgCount}件をアップロードしました。`
+      else if (failCount > 0) note = `\n⚠️ 画像 ${failCount}件のアップロードに失敗しました。もう一度「反映」を押すと再試行します。`
       return {
         ok: true,
-        message: (options.message || `✅ 反映しました（公開中 ${merged.length}件）`) + imgNote
+        message: (options.message || `✅ 反映しました（公開中 ${merged.length}件）`) + note
       }
     }
     return { ok: false, message: data.message || `サーバーエラー (${res.status})` }
