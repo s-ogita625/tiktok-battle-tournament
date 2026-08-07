@@ -1,6 +1,5 @@
 import { store, defaultTournament } from '../data/store.js'
 import { generateId } from '../utils/exportUtils.js'
-import { publishTournamentData } from '../utils/publishUtils.js'
 
 export function renderHomeScreen(container, onEnterTournament) {
   function render() {
@@ -163,36 +162,10 @@ export function renderHomeScreen(container, onEnterTournament) {
       })
     })
 
-    // 公開/非公開トグル
-    container.querySelectorAll('[data-toggle-public]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const id = btn.dataset.togglePublic
-        const t = store.getState().tournaments.find(x => x.id === id)
-        if (!t) return
-        store.setPublic(id, !t.isPublic)
-        await autoPublish()
-      })
-    })
-
     // 閲覧リンクをコピー
     container.querySelectorAll('[data-copy-link]').forEach(btn => {
       btn.addEventListener('click', () => copyViewerLink(btn.dataset.copyLink))
     })
-  }
-
-  /**
-   * 公開中の大会を自動的に /api/publish へ送信する
-   */
-  async function autoPublish() {
-    const { tournaments } = store.getState()
-    const publicOnes = tournaments.filter(t => t.isPublic === true)
-
-    const result = await publishTournamentData(publicOnes)
-    if (result.ok) {
-      showHomeToast(`✅ ${publicOnes.length}件の大会を公開しました（Vercel反映まで約1〜2分）`, 'success')
-    } else {
-      showHomeToast(`⚠️ 公開の更新に失敗: ${result.message}`, 'error')
-    }
   }
 
   store.subscribe(render)
@@ -258,10 +231,9 @@ function renderTournamentCard(t, isPast) {
         </div>
       </div>
       <div class="home-tc-actions">
-        <button class="btn btn-sm ${isPublic ? 'btn-teal' : 'btn-secondary'}" data-toggle-public="${t.id}"
-                title="${isPublic ? '閲覧ページで公開中（クリックで非公開）' : '非公開（クリックで公開）'}">
+        <span class="badge ${isPublic ? 'badge-teal' : 'badge-muted'}" title="公開設定は「開く」→設定タブで切り替えます">
           ${isPublic ? '🌐 公開中' : '🔒 非公開'}
-        </button>
+        </span>
         <button class="btn btn-secondary btn-sm" data-copy-link="${t.id}" title="この大会の閲覧リンクをコピー">🔗 リンク</button>
         <button class="btn btn-primary btn-sm" data-open-tournament="${t.id}">${isPast ? '👁 開く' : '▶ 開く'}</button>
         ${isPast ? `<button class="btn btn-danger btn-sm" data-delete-tournament="${t.id}" title="削除">🗑</button>` : ''}

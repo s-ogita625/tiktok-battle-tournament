@@ -83,16 +83,30 @@ export function renderSettings(container) {
         <div class="settings-section">
           <h2 class="settings-section-title">🌐 閲覧ページへ公開</h2>
           <p style="font-size:0.8rem;color:var(--color-text-muted);margin-bottom:12px;line-height:1.6">
-            「公開中」に設定した大会を閲覧ページ（スマホ等）に即座に反映します。<br>
-            ホーム画面の <strong style="color:var(--color-text)">🌐 公開中 / 🔒 非公開</strong> ボタンで大会ごとに公開設定を切り替えてください。<br>
+            この大会を閲覧ページ（スマホ等）に公開できます。公開のON/OFFはこの画面で切り替えます。<br>
             <span style="color:var(--color-text-dim);font-size:0.75rem">
               ※ GitHub Gist 経由で配信されます。デプロイ不要・即時反映されます。
             </span>
           </p>
-          ${renderPublishStatus(ct)}
-          <div class="data-actions">
-            <button class="btn btn-primary" id="publish-btn">🚀 閲覧ページに反映する</button>
+
+          <div class="settings-row">
+            <div>
+              <div class="settings-label">この大会の公開状態</div>
+              <div class="settings-desc">${ct.isPublic
+                ? '🌐 公開中 — 閲覧ページに表示されています'
+                : '🔒 非公開 — 閲覧ページには表示されません'}</div>
+            </div>
+            <button class="btn btn-sm ${ct.isPublic ? 'btn-teal' : 'btn-secondary'}" id="toggle-public-btn">
+              ${ct.isPublic ? '🌐 公開中（クリックで非公開）' : '🔒 非公開（クリックで公開）'}
+            </button>
           </div>
+
+          <div class="data-actions" style="margin-top:10px">
+            <button class="btn btn-primary" id="publish-btn" ${ct.isPublic ? '' : 'disabled title="公開中にすると反映できます"'}>🚀 最新の内容を反映する</button>
+          </div>
+          <p style="font-size:0.75rem;color:var(--color-text-muted);margin-top:8px;line-height:1.6">
+            「公開中」に切り替えると自動で反映されます。公開後に数値を更新したら「🚀 最新の内容を反映する」で閲覧ページを更新してください。
+          </p>
           <div id="publish-result" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;font-size:0.82rem;line-height:1.6;white-space:pre-line"></div>
         </div>
 
@@ -166,31 +180,48 @@ export function renderSettings(container) {
       store.updateTournament(ct => ({ settings: { ...ct.settings, defaultBattleTimes: times } }))
     })
 
-    // 公開データ更新
-    container.querySelector('#publish-btn')?.addEventListener('click', async () => {
-      const { tournaments } = store.getState()
-      const publicOnes = tournaments.filter(t => t.isPublic === true)
-
-      const btn = container.querySelector('#publish-btn')
+    // 公開中の全大会を /api/publish へ送信する共通処理
+    async function runPublish(startMsg = '⏳ 準備中...') {
       const resultEl = container.querySelector('#publish-result')
-      btn.disabled = true
-      btn.textContent = '⏳ 更新中...'
-      resultEl.style.display = ''
-      resultEl.style.background = 'rgba(255,255,255,0.05)'
-      resultEl.style.border = '1px solid var(--color-border)'
-      resultEl.style.color = 'var(--color-text-muted)'
-      resultEl.textContent = '⏳ 準備中...'
-
+      const publicOnes = store.getState().tournaments.filter(t => t.isPublic === true)
+      if (resultEl) {
+        resultEl.style.display = ''
+        resultEl.style.background = 'rgba(255,255,255,0.05)'
+        resultEl.style.border = '1px solid var(--color-border)'
+        resultEl.style.color = 'var(--color-text-muted)'
+        resultEl.textContent = startMsg
+      }
       const result = await publishTournamentData(publicOnes, (msg) => {
-        resultEl.textContent = msg
+        if (resultEl) resultEl.textContent = msg
       })
+      if (resultEl) {
+        resultEl.style.background = result.ok ? 'rgba(76,175,80,0.1)' : 'rgba(244,67,54,0.1)'
+        resultEl.style.border = result.ok ? '1px solid rgba(76,175,80,0.3)' : '1px solid rgba(244,67,54,0.3)'
+        resultEl.style.color = result.ok ? 'var(--color-success)' : 'var(--color-danger)'
+        resultEl.textContent = result.message
+      }
+      return result
+    }
 
+    // 公開ON/OFF切替（この大会）→ 自動で反映
+    container.querySelector('#toggle-public-btn')?.addEventListener('click', async () => {
+      const ct2 = store.getState().currentTournament
+      if (!ct2) return
+      const nextPublic = !ct2.isPublic
+      const btn = container.querySelector('#toggle-public-btn')
+      btn.disabled = true
+      store.setPublic(ct2.id, nextPublic) // ← 再描画でボタン表示も更新される
+      await runPublish(nextPublic ? '⏳ 公開して反映中...' : '⏳ 非公開にして反映中...')
+    })
+
+    // 最新の内容を反映（数値更新後の再送信）
+    container.querySelector('#publish-btn')?.addEventListener('click', async () => {
+      const btn = container.querySelector('#publish-btn')
+      btn.disabled = true
+      btn.textContent = '⏳ 反映中...'
+      await runPublish()
       btn.disabled = false
-      btn.textContent = '🚀 閲覧ページに反映する'
-      resultEl.style.background = result.ok ? 'rgba(76,175,80,0.1)' : 'rgba(244,67,54,0.1)'
-      resultEl.style.border = result.ok ? '1px solid rgba(76,175,80,0.3)' : '1px solid rgba(244,67,54,0.3)'
-      resultEl.style.color = result.ok ? 'var(--color-success)' : 'var(--color-danger)'
-      resultEl.textContent = result.message
+      btn.textContent = '🚀 最新の内容を反映する'
     })
 
     // エクスポート
