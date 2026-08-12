@@ -1,5 +1,5 @@
 import { store } from '../data/store.js'
-import { formatDate } from '../utils/dateUtils.js'
+import { formatDate, formatDateEntry } from '../utils/dateUtils.js'
 import { renderParticipantForm } from './ParticipantForm.js'
 import { calcGroupStructure } from '../services/groupService.js'
 
@@ -126,7 +126,7 @@ function renderParticipantCard(p, hasGroups, ct) {
           <div>
             <span style="color:var(--color-success);font-weight:600">✓ 可能:</span>
             <div class="participant-dates" style="margin-top:2px">
-              ${avail.map(d => `<span class="date-chip available">${formatDate(d)}</span>`).join('')}
+              ${avail.map(d => `<span class="date-chip available">${formatDateEntry(d)}</span>`).join('')}
               ${(p.availableDates || []).length > 3 ? `<span class="date-chip available">+${(p.availableDates || []).length - 3}</span>` : ''}
             </div>
           </div>
@@ -135,7 +135,7 @@ function renderParticipantCard(p, hasGroups, ct) {
           <div>
             <span style="color:var(--color-danger);font-weight:600">✗ 不可:</span>
             <div class="participant-dates" style="margin-top:2px">
-              ${unavail.map(d => `<span class="date-chip unavailable">${formatDate(d)}</span>`).join('')}
+              ${unavail.map(d => `<span class="date-chip unavailable">${formatDateEntry(d)}</span>`).join('')}
               ${(p.unavailableDates || []).length > 2 ? `<span class="date-chip unavailable">+${(p.unavailableDates || []).length - 2}</span>` : ''}
             </div>
           </div>

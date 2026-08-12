@@ -4,14 +4,26 @@ export function today() {
 }
 
 // YYYY-MM-DD を "MM/DD (曜日)" 形式にフォーマット
+// "YYYY-MM-DD|HH:MM-HH:MM" のような時間帯付きエントリが渡っても、
+// 日付部分だけを取り出して整形する（従来は Invalid Date → "NaN/NaN (undefined)" になっていた）
 export function formatDate(dateStr) {
   if (!dateStr) return '日程未定'
-  const date = new Date(dateStr + 'T00:00:00')
+  const datePart = String(dateStr).split('|')[0]
+  const date = new Date(datePart + 'T00:00:00')
+  if (isNaN(date.getTime())) return String(dateStr) // 念のためのフォールバック
   const days = ['日', '月', '火', '水', '木', '金', '土']
   const month = date.getMonth() + 1
   const day = date.getDate()
   const dow = days[date.getDay()]
   return `${month}/${day} (${dow})`
+}
+
+// 日程エントリ（時間帯付き可）を "MM/DD (曜日) HH:MM-HH:MM" 形式に整形
+export function formatDateEntry(entry) {
+  if (!entry) return '日程未定'
+  const base = formatDate(entry)
+  const timePart = getTimePart(entry)
+  return timePart ? `${base} ${timePart}` : base
 }
 
 // YYYY-MM-DD の配列から重複を除いてソートして返す
